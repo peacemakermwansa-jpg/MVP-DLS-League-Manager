@@ -24,14 +24,15 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-/** A competition/season managed in MVP. */
+/** A competition/season belongs to exactly one authenticated user. */
 export const leagues = mysqlTable("leagues", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 120 }).notNull(),
   seasonName: varchar("seasonName", { length: 120 }).notNull(),
   numberOfTeams: int("numberOfTeams").notNull(),
-  /** Nullable until auth is enabled for the league manager workflow. */
-  createdBy: int("createdBy"),
+  createdBy: int("createdBy")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

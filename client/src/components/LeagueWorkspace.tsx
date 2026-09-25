@@ -148,6 +148,7 @@ export default function LeagueWorkspace() {
   const view = location === "/" ? "overview" : location.slice(1);
   const [activeLeagueId, setActiveLeagueId] = useState<number | null>(null);
   const [leagueForm, setLeagueForm] = useState<LeagueForm>(EMPTY_LEAGUE_FORM);
+  const [editingLeagueId, setEditingLeagueId] = useState<number | null>(null);
   const [teamForm, setTeamForm] = useState<TeamForm>(EMPTY_TEAM_FORM);
   const [editingTeamId, setEditingTeamId] = useState<number | null>(null);
   const [resultForm, setResultForm] = useState({ fixtureId: "", homeScore: "", awayScore: "" });
@@ -189,6 +190,26 @@ export default function LeagueWorkspace() {
       setLeagueForm(EMPTY_LEAGUE_FORM);
       await refreshLeague(id);
       setLocation("/leagues");
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+  const updateLeagueMutation = trpc.league.update.useMutation({
+    onSuccess: async () => {
+      toast.success("League details updated.");
+      setEditingLeagueId(null);
+      setLeagueForm(EMPTY_LEAGUE_FORM);
+      await refreshLeague();
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  });
+  const deleteLeagueMutation = trpc.league.delete.useMutation({
+    onSuccess: async () => {
+      toast.success("League deleted.");
+      setEditingLeagueId(null);
+      setLeagueForm(EMPTY_LEAGUE_FORM);
+      setActiveLeagueId(null);
+      await refreshLeague();
+      setLocation("/");
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -247,7 +268,9 @@ export default function LeagueWorkspace() {
 
   const handleCreateLeague = (event: FormEvent) => {
     event.preventDefault();
-    createLeagueMutation.mutate({ ...leagueForm, numberOfTeams: Number(leagueForm.numberOfTeams) });
+    const input = { ...leagueForm, numberOfTeams: Number(leagueForm.numberOfTeams) };
+    if (editingLeagueId) updateLeagueMutation.mutate({ ...input, leagueId: editingLeagueId });
+    else createLeagueMutation.mutate(input);
   };
 
   const handleSaveTeam = (event: FormEvent) => {
@@ -274,7 +297,7 @@ export default function LeagueWorkspace() {
     <Card className="rounded-[22px] border-border/80 bg-card shadow-none">
       <CardHeader className="border-b border-border/70 pb-5">
         <div className="flex items-start justify-between gap-4">
-          <div><CardTitle className="text-lg">Create a league</CardTitle><CardDescription className="mt-2">Set the season up once. You can add teams and generate the schedule next.</CardDescription></div>
+          <div><CardTitle className="text-lg">{editingLeagueId ? "Edit league" : "Create a league"}</CardTitle><CardDescription className="mt-2">{editingLeagueId ? "Update the details for your owned competition." : "Set the season up once. You can add teams and generate the schedule next."}</CardDescription></div>
           <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary"><Plus className="size-5" /></div>
         </div>
       </CardHeader>
@@ -283,7 +306,7 @@ export default function LeagueWorkspace() {
           <Field label="League name"><Input required value={leagueForm.name} onChange={(event) => setLeagueForm({ ...leagueForm, name: event.target.value })} placeholder="e.g. MVP Premier League" /></Field>
           <Field label="Season name"><Input required value={leagueForm.seasonName} onChange={(event) => setLeagueForm({ ...leagueForm, seasonName: event.target.value })} placeholder="e.g. 2026 Season 1" /></Field>
           <Field label="Number of teams" hint="2–32"><Input required min={2} max={32} type="number" value={leagueForm.numberOfTeams} onChange={(event) => setLeagueForm({ ...leagueForm, numberOfTeams: event.target.value })} /></Field>
-          <Button type="submit" className="mt-2 h-11 rounded-xl font-bold" disabled={createLeagueMutation.isPending}>{createLeagueMutation.isPending ? "Creating…" : "Create league"}<ArrowRight className="size-4" /></Button>
+          <div className="flex gap-2 pt-2"><Button type="submit" className="mt-0 h-11 flex-1 rounded-xl font-bold" disabled={createLeagueMutation.isPending || updateLeagueMutation.isPending}>{editingLeagueId ? "Save changes" : createLeagueMutation.isPending ? "Creating…" : "Create league"}<ArrowRight className="size-4" /></Button>{editingLeagueId && <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={() => { setEditingLeagueId(null); setLeagueForm(EMPTY_LEAGUE_FORM); }}>Cancel</Button>}</div>
         </form>
       </CardContent>
     </Card>
@@ -329,8 +352,32 @@ export default function LeagueWorkspace() {
 
   const renderLeagues = () => (
     <>
-      <SectionHeading eyebrow="League management" title="Shape the competition." description="Create seasons, keep the league register clear, and switch between competitions without losing context." action={<Button onClick={() => setLocation("/")} variant="outline" className="h-10 rounded-xl">Back to overview</Button>} />
-      <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(320px,0.72fr)_minmax(0,1.28fr)]"><div>{renderLeagueForm()}</div><Card className="rounded-[22px] border-border/80 bg-card shadow-none"><CardHeader className="border-b border-border/70 pb-5"><CardTitle className="text-lg">Registered leagues</CardTitle><CardDescription>{leagueSummaries.length ? `${leagueSummaries.length} competition${leagueSummaries.length === 1 ? "" : "s"} in your workspace.` : "Your league list will appear here."}</CardDescription></CardHeader><CardContent className="grid gap-3 p-5">{leagueSummaries.length ? leagueSummaries.map((league) => <button key={league.id} onClick={() => { setActiveLeagueId(league.id); setLocation("/teams"); }} className={`flex flex-col gap-4 rounded-2xl border p-4 text-left transition-all sm:flex-row sm:items-center sm:justify-between ${activeId === league.id ? "border-primary/50 bg-primary/5" : "border-border/80 hover:border-primary/30"}`}><div className="flex items-center gap-3"><div className="grid size-11 place-items-center rounded-xl bg-secondary text-xs font-bold">{initials(league.name)}</div><div><p className="font-bold">{league.name}</p><p className="mt-1 text-sm text-muted-foreground">{league.seasonName} · created {formatDate(league.createdAt)}</p></div></div><div className="flex items-center gap-4 text-xs text-muted-foreground"><span><strong className="text-foreground">{league.teamCount}</strong> teams</span><span><strong className="text-foreground">{league.completedFixtureCount}</strong> results</span><ChevronRight className="size-4" /></div></button>) : <EmptyState icon={Trophy} title="Start with one competition" description="A league holds its season name, team limit, fixtures, results, and table in one place." />}</CardContent></Card></div>
+      <SectionHeading
+        eyebrow="League management"
+        title="Shape the competition."
+        description="Create seasons, keep the league register clear, and manage only the competitions that belong to you."
+        action={<Button onClick={() => setLocation("/")} variant="outline" className="h-10 rounded-xl">Back to overview</Button>}
+      />
+      <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(320px,0.72fr)_minmax(0,1.28fr)]">
+        <div>{renderLeagueForm()}</div>
+        <Card className="rounded-[22px] border-border/80 bg-card shadow-none">
+          <CardHeader className="border-b border-border/70 pb-5">
+            <CardTitle className="text-lg">My leagues</CardTitle>
+            <CardDescription>{leagueSummaries.length ? `${leagueSummaries.length} competition${leagueSummaries.length === 1 ? "" : "s"} owned by you.` : "Your league list will appear here."}</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 p-5">
+            {leagueSummaries.length ? leagueSummaries.map((league) => (
+              <div key={league.id} className={`flex flex-col gap-4 rounded-2xl border p-4 transition-all sm:flex-row sm:items-center sm:justify-between ${activeId === league.id ? "border-primary/50 bg-primary/5" : "border-border/80 hover:border-primary/30"}`}>
+                <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => { setActiveLeagueId(league.id); setLocation("/"); }}>
+                  <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-secondary text-xs font-bold">{initials(league.name)}</div>
+                  <div className="min-w-0"><p className="truncate font-bold">{league.name}</p><p className="mt-1 text-sm text-muted-foreground">{league.seasonName} · {league.teamCount}/{league.numberOfTeams} teams</p></div>
+                </button>
+                <div className="flex items-center justify-between gap-4 sm:justify-end"><div className="flex items-center gap-4 text-xs text-muted-foreground"><span><strong className="text-foreground">{league.teamCount}</strong> teams</span><span><strong className="text-foreground">{league.completedFixtureCount}</strong> results</span></div><div className="flex gap-1"><Button variant="ghost" size="icon-sm" onClick={() => { setActiveLeagueId(league.id); setEditingLeagueId(league.id); setLeagueForm({ name: league.name, seasonName: league.seasonName, numberOfTeams: String(league.numberOfTeams) }); }} aria-label={`Edit ${league.name}`}><Pencil className="size-4" /></Button><Button variant="ghost" size="icon-sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => { if (window.confirm(`Delete ${league.name}? This removes its teams, fixtures, and results.`)) deleteLeagueMutation.mutate({ leagueId: league.id }); }} aria-label={`Delete ${league.name}`}><Trash2 className="size-4" /></Button></div></div>
+              </div>
+            )) : <EmptyState icon={Trophy} title="Start with one competition" description="A league holds its season name, team limit, fixtures, results, and table in one place." />}
+          </CardContent>
+        </Card>
+      </div>
     </>
   );
 

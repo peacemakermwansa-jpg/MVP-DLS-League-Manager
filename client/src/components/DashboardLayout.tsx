@@ -57,13 +57,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
-  const { loading } = useAuth();
+  const { loading, user } = useAuth();
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
   }, [sidebarWidth]);
 
   if (loading) return <DashboardLayoutSkeleton />;
+  if (!user) return <AuthScreen />;
 
   return (
     <SidebarProvider
@@ -173,7 +174,7 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
                   {!isCollapsed && (
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-sidebar-foreground">{displayName}</p>
-                      <p className="truncate text-[11px] text-sidebar-foreground/50">Admin workspace</p>
+                      <p className="truncate text-[11px] text-sidebar-foreground/50">{user?.email || "Authenticated workspace"}</p>
                     </div>
                   )}
                 </button>
@@ -211,5 +212,26 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
         <main className="min-h-screen flex-1">{children}</main>
       </SidebarInset>
     </>
+  );
+}
+
+function AuthScreen() {
+  return (
+    <div className="mvp-grid grid min-h-screen place-items-center bg-background p-6">
+      <div className="w-full max-w-md rounded-[28px] border border-border/80 bg-card p-7 shadow-[0_20px_70px_rgba(22,25,38,0.08)] sm:p-9">
+        <div className="flex items-center gap-3">
+          <div className="grid size-11 place-items-center rounded-2xl bg-primary text-sm font-black text-primary-foreground shadow-[0_8px_24px_rgba(151,190,30,0.24)]">MVP</div>
+          <div><p className="text-sm font-black uppercase tracking-[0.18em]">MVP</p><p className="text-xs text-muted-foreground">DLS League Manager</p></div>
+        </div>
+        <p className="mt-10 text-[11px] font-bold uppercase tracking-[0.2em] text-primary">Private league workspace</p>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight">Manage your competition with confidence.</h1>
+        <p className="mt-4 text-sm leading-6 text-muted-foreground">Sign in to create leagues, register teams, record results, and keep your own standings secure.</p>
+        <div className="mt-7 grid gap-3">
+          <button onClick={() => startLogin()} className="flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground transition-transform active:scale-[0.98]"><LogIn className="size-4" /> Log in</button>
+          <button onClick={() => startLogin()} className="flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-transparent px-4 text-sm font-bold transition-colors hover:bg-muted active:scale-[0.98]">Create an account <span aria-hidden="true">→</span></button>
+        </div>
+        <p className="mt-6 text-center text-xs leading-5 text-muted-foreground">Authentication is handled securely by the configured Manus OAuth provider. New users can create an account from the same secure flow.</p>
+      </div>
+    </div>
   );
 }

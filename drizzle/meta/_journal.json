@@ -15,6 +15,13 @@
       "when": 1790311749563,
       "tag": "0001_famous_toad_men",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1790314536281,
+      "tag": "0002_odd_chameleon",
+      "breakpoints": true
     }
   ]
 }
