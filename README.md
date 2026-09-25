@@ -101,3 +101,39 @@ For a configured database, generate migrations with `pnpm drizzle-kit generate` 
 ## Remaining limitations
 
 Authentication currently uses Manus OAuth rather than a custom password form. The provider's secure flow handles both login and new-account creation. The first stage does not yet include email/password authentication, password reset, user invitations, role-specific admin panels, image uploads, match dates/venues, advanced statistics, payments, or WhatsApp automation. League deletion is available to the owner and cascades its teams and fixtures by design.
+
+
+## Player registration stage
+
+The authenticated product now supports player participation without changing league ownership. A user can have one `leaguePlayers` profile in each league, so the same account can participate across multiple competitions with a different player name, username, team, and registration status per league.
+
+Players can register for a league by its ID or be added by an owner using the email attached to their existing OAuth account. Registrations begin as `pending`. The league owner can approve or reject them, assign an approved player to a team, change the assignment, or remove the registration. Players can update only their own profile fields.
+
+The player centre displays each registration, approval status, assigned team, current position and football record, plus upcoming and completed fixtures. Approved players and league owners can open a team page with its roster and current season statistics. Fixture deadlines are now represented by an optional `fixtures.deadline` field; existing schedules show no deadline until one is set.
+
+### Player permissions
+
+| Action | League owner | Approved/pending player |
+| --- | --- | --- |
+| View owned league data | Yes | No, unless through player/team views allowed by membership |
+| Create/edit/delete own league | Yes | Not for another user's league |
+| Generate fixtures or record results | Yes | No for another user's league |
+| Add, approve, reject, assign, or remove players | Yes | No |
+| Update own player profile | No special need | Yes |
+| View own league fixtures and team | Yes | Approved membership only for team pages |
+
+Player-management routes always verify that the authenticated user owns the target league. Direct requests with another user's league or membership ID return an authorization error rather than mutating data.
+
+### New files and routes
+
+```text
+server/players.ts                              Membership and team-page data layer
+server/player.ownership.test.ts                Player registration and permission integration test
+client/src/components/PlayerDashboard.tsx     Player centre and self-registration/profile UI
+client/src/components/PlayerManagement.tsx     Owner registration review and team assignment UI
+client/src/components/TeamPage.tsx             Protected team detail page
+```
+
+The new database migration is `drizzle/0003_neat_goblin_queen.sql`. It creates `leaguePlayers`, adds the nullable fixture `deadline`, and adds foreign keys to leagues, users, and teams.
+
+The current first-stage invitation flow requires the player to have created an account before the owner adds them by email. Email/WhatsApp notifications and a separate invitation-token workflow remain intentionally out of scope until the core player registry is stable.

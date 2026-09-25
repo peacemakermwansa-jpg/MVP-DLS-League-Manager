@@ -30,6 +30,7 @@ import {
   PanelLeft,
   ShieldCheck,
   Trophy,
+  UserRound,
   Users,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -43,6 +44,8 @@ const menuItems = [
   { icon: CalendarDays, label: "Fixtures", path: "/fixtures" },
   { icon: ClipboardCheck, label: "Results", path: "/results" },
   { icon: ShieldCheck, label: "League table", path: "/table" },
+  { icon: UserRound, label: "My player centre", path: "/player" },
+  { icon: Users, label: "Player register", path: "/players" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "mvp-sidebar-width";

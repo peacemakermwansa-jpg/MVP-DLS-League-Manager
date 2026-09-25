@@ -4,39 +4,24 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
-  addTeam,
-  createLeague,
-  deleteLeague,
-  generateFixtures,
-  getLeagueDashboard,
-  listLeagues,
-  recordResult,
-  removeTeam,
-  updateLeague,
-  updateTeam,
+  addTeam, createLeague, deleteLeague, generateFixtures, getLeagueDashboard, listLeagues,
+  recordResult, removeTeam, updateLeague, updateTeam,
 } from "./league";
+import {
+  addPlayerByEmail, applyToLeague, listLeaguePlayers, playerDashboard, removePlayer,
+  reviewPlayer, teamPage, updateOwnProfile,
+} from "./players";
 
 const leagueIdInput = z.object({ leagueId: z.number().int().positive() });
-const teamDetails = z.object({
-  name: z.string().trim().min(2).max(120),
-  managerName: z.string().trim().min(2).max(120),
-  logoUrl: z.string().trim().url().max(500).optional().or(z.literal("")),
-});
-const leagueDetails = z.object({
-  name: z.string().trim().min(2).max(120),
-  seasonName: z.string().trim().min(2).max(120),
-  numberOfTeams: z.number().int().min(2).max(32),
-});
+const teamDetails = z.object({ name: z.string().trim().min(2).max(120), managerName: z.string().trim().min(2).max(120), logoUrl: z.string().trim().url().max(500).optional().or(z.literal("")) });
+const leagueDetails = z.object({ name: z.string().trim().min(2).max(120), seasonName: z.string().trim().min(2).max(120), numberOfTeams: z.number().int().min(2).max(32) });
+const playerDetails = z.object({ playerName: z.string().trim().min(2).max(120), username: z.string().trim().min(2).max(64).regex(/^[a-zA-Z0-9_.-]+$/), profilePicture: z.string().trim().url().max(500).optional().or(z.literal("")), whatsappNumber: z.string().trim().max(32).optional().or(z.literal("")) });
 
 export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return { success: true } as const;
-    }),
+    logout: publicProcedure.mutation(({ ctx }) => { const cookieOptions = getSessionCookieOptions(ctx.req); ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 }); return { success: true } as const; }),
   }),
   league: router({
     overview: protectedProcedure.query(({ ctx }) => listLeagues(ctx.user.id)),
@@ -48,12 +33,19 @@ export const appRouter = router({
     updateTeam: protectedProcedure.input(teamDetails.extend({ teamId: z.number().int().positive() })).mutation(({ ctx, input }) => updateTeam({ ...input, userId: ctx.user.id })),
     removeTeam: protectedProcedure.input(z.object({ teamId: z.number().int().positive() })).mutation(({ ctx, input }) => removeTeam(input.teamId, ctx.user.id)),
     generateFixtures: protectedProcedure.input(leagueIdInput).mutation(({ ctx, input }) => generateFixtures(input.leagueId, ctx.user.id)),
-    recordResult: protectedProcedure.input(z.object({
-      fixtureId: z.number().int().positive(),
-      homeScore: z.number().int().min(0).max(99),
-      awayScore: z.number().int().min(0).max(99),
-    })).mutation(({ ctx, input }) => recordResult({ ...input, userId: ctx.user.id })),
+    recordResult: protectedProcedure.input(z.object({ fixtureId: z.number().int().positive(), homeScore: z.number().int().min(0).max(99), awayScore: z.number().int().min(0).max(99) })).mutation(({ ctx, input }) => recordResult({ ...input, userId: ctx.user.id })),
+  }),
+  player: router({
+    dashboard: protectedProcedure.query(({ ctx }) => playerDashboard(ctx.user.id)),
+    register: protectedProcedure.input(leagueIdInput.merge(playerDetails)).mutation(({ ctx, input }) => applyToLeague({ ...input, userId: ctx.user.id })),
+    updateProfile: protectedProcedure.input(playerDetails.extend({ membershipId: z.number().int().positive() })).mutation(({ ctx, input }) => updateOwnProfile({ ...input, userId: ctx.user.id })),
+    team: protectedProcedure.input(z.object({ teamId: z.number().int().positive() })).query(({ ctx, input }) => teamPage(input.teamId, ctx.user.id)),
+  }),
+  playerAdmin: router({
+    list: protectedProcedure.input(leagueIdInput).query(({ ctx, input }) => listLeaguePlayers(input.leagueId, ctx.user.id)),
+    add: protectedProcedure.input(leagueIdInput.extend({ email: z.string().trim().email() }).merge(playerDetails)).mutation(({ ctx, input }) => addPlayerByEmail({ ...input, userId: ctx.user.id })),
+    review: protectedProcedure.input(z.object({ membershipId: z.number().int().positive(), registrationStatus: z.enum(["approved", "rejected"]), teamId: z.number().int().positive().nullable().optional() })).mutation(({ ctx, input }) => reviewPlayer({ ...input, userId: ctx.user.id })),
+    remove: protectedProcedure.input(z.object({ membershipId: z.number().int().positive() })).mutation(({ ctx, input }) => removePlayer(input.membershipId, ctx.user.id)),
   }),
 });
-
 export type AppRouter = typeof appRouter;
