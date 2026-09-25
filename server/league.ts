@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { fixtures, leagues, teams, type Fixture, type League, type Team } from "../drizzle/schema";
+import { fixtures, leagues, teams, type Fixture, type Team } from "../drizzle/schema";
 import { getDb } from "./db";
 
 export type ScheduledFixture = Fixture & { homeTeam: Team; awayTeam: Team };
@@ -209,6 +209,7 @@ export async function recordResult(input: { fixtureId: number; homeScore: number
   if (!fixture) throw new TRPCError({ code: "NOT_FOUND", message: "Fixture not found." });
   await requireOwnedLeague(db, fixture.leagueId, input.userId);
   if (fixture.status === "completed") throw new TRPCError({ code: "CONFLICT", message: "This fixture already has a recorded result." });
-  await db.update(fixtures).set({ homeScore: input.homeScore, awayScore: input.awayScore, status: "completed", playedAt: new Date() }).where(eq(fixtures.id, input.fixtureId));
+  const updateResult = await db.update(fixtures).set({ homeScore: input.homeScore, awayScore: input.awayScore, status: "completed", playedAt: new Date() }).where(and(eq(fixtures.id, input.fixtureId), eq(fixtures.status, "pending")));
+  if (updateResult[0].affectedRows !== 1) throw new TRPCError({ code: "CONFLICT", message: "This fixture already has a recorded result." });
   return { success: true } as const;
 }

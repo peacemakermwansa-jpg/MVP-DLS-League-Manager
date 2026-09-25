@@ -18,7 +18,6 @@ export default function PlayerManagement() {
   const activeLeagueId = Number(leagueId) || 0;
   const dashboard = trpc.league.dashboard.useQuery({ leagueId: activeLeagueId }, { enabled: activeLeagueId > 0, refetchOnWindowFocus: false });
   const players = trpc.playerAdmin.list.useQuery({ leagueId: activeLeagueId }, { enabled: activeLeagueId > 0, refetchOnWindowFocus: false });
-  const utils = trpc.useUtils();
   const refresh = async () => { await Promise.all([players.refetch(), dashboard.refetch(), leagues.refetch()]); };
   const add = trpc.playerAdmin.add.useMutation({ onSuccess: async () => { toast.success("Player registration added for review."); setForm({ email: "", playerName: "", username: "", whatsappNumber: "" }); await refresh(); }, onError: (error) => toast.error(errorText(error)) });
   const review = trpc.playerAdmin.review.useMutation({ onSuccess: async () => { toast.success("Player registration updated."); await refresh(); }, onError: (error) => toast.error(errorText(error)) });

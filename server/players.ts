@@ -1,6 +1,6 @@
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { fixtures, leaguePlayers, leagues, teams, users, type LeaguePlayer } from "../drizzle/schema";
+import { fixtures, leaguePlayers, leagues, teams, users } from "../drizzle/schema";
 import { calculateStandings } from "./league";
 import { getDb } from "./db";
 

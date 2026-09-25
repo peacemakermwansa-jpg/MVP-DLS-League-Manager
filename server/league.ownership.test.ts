@@ -53,6 +53,7 @@ describeWithDatabase("league ownership flow", () => {
     const pendingFixture = dashboardBeforeResult.fixtures.find((fixture) => fixture.status === "pending");
     if (!pendingFixture) throw new Error("Expected a pending fixture.");
     await callerA.league.recordResult({ fixtureId: pendingFixture.id, homeScore: 3, awayScore: 1 });
+    await expect(callerA.league.recordResult({ fixtureId: pendingFixture.id, homeScore: 0, awayScore: 9 })).rejects.toMatchObject({ code: "CONFLICT" });
     const dashboardAfterResult = await callerA.league.dashboard({ leagueId });
     expect(dashboardAfterResult.standings[0]).toMatchObject({ teamName: "Alpha", points: 3, goalsFor: 3, goalsAgainst: 1, goalDifference: 2 });
 

@@ -1,8 +1,7 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Shield, UserRound } from "lucide-react";
+import { ArrowLeft, UserRound } from "lucide-react";
 import { useLocation, useRoute } from "wouter";
 
 export default function TeamPage() {
