@@ -28,6 +28,22 @@ export async function findLeague(leagueId: number) {
   return rows[0];
 }
 
+export async function findPlayerByPlayerId(playerId: number) {
+  const db = await requireDb();
+  const rows = await db.select({ playerId: users.playerId, playerName: users.name }).from(users).where(eq(users.playerId, playerId)).limit(1);
+  const player = rows[0];
+  if (!player) throw new TRPCError({ code: "NOT_FOUND", message: `Player not found for Player ID ${playerId}. Check the number and try again.` });
+  return { playerId: player.playerId, playerName: player.playerName?.trim() || `Player ${player.playerId}` };
+}
+
+export async function playerProfile(userId: number) {
+  const db = await requireDb();
+  const rows = await db.select({ playerId: users.playerId, playerName: users.name }).from(users).where(eq(users.id, userId)).limit(1);
+  const profile = rows[0];
+  if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "Player profile not found." });
+  return { playerId: profile.playerId, playerName: profile.playerName?.trim() || `Player ${profile.playerId}` };
+}
+
 export async function applyToLeague(input: { leagueId: number; playerName: string; username: string; profilePicture?: string; whatsappNumber?: string; userId: number }) {
   const db = await requireDb();
   const leagueRows = await db.select({ id: leagues.id }).from(leagues).where(eq(leagues.id, input.leagueId)).limit(1);
@@ -74,19 +90,21 @@ export async function playerDashboard(userId: number) {
 export async function listLeaguePlayers(leagueId: number, userId: number) {
   const db = await requireDb();
   await requireOwnedLeague(db, leagueId, userId);
-  return db.select({ membership: leaguePlayers, user: users, team: teams }).from(leaguePlayers).innerJoin(users, eq(users.id, leaguePlayers.userId)).leftJoin(teams, eq(teams.id, leaguePlayers.teamId)).where(eq(leaguePlayers.leagueId, leagueId)).orderBy(asc(leaguePlayers.registrationStatus), asc(leaguePlayers.playerName));
+  return db.select({ membership: leaguePlayers, user: { playerId: users.playerId, name: users.name }, team: teams }).from(leaguePlayers).innerJoin(users, eq(users.id, leaguePlayers.userId)).leftJoin(teams, eq(teams.id, leaguePlayers.teamId)).where(eq(leaguePlayers.leagueId, leagueId)).orderBy(asc(leaguePlayers.registrationStatus), asc(leaguePlayers.playerName));
 }
 
-export async function addPlayerByEmail(input: { leagueId: number; email: string; playerName: string; username: string; profilePicture?: string; whatsappNumber?: string; userId: number }) {
+export async function addPlayerByPlayerId(input: { leagueId: number; playerId: number; userId: number }) {
   const db = await requireDb();
   await requireOwnedLeague(db, input.leagueId, input.userId);
-  const accountRows = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email)).limit(1);
+  const accountRows = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.playerId, input.playerId)).limit(1);
   const account = accountRows[0];
-  if (!account) throw new TRPCError({ code: "NOT_FOUND", message: "No account found for that email. Ask the player to create an account first." });
+  if (!account) throw new TRPCError({ code: "NOT_FOUND", message: `Player not found for Player ID ${input.playerId}. Check the number and try again.` });
   if (await getMembership(db, input.leagueId, account.id)) throw new TRPCError({ code: "CONFLICT", message: "This account is already registered in the league." });
-  const duplicateUsername = await db.select({ id: leaguePlayers.id }).from(leaguePlayers).where(and(eq(leaguePlayers.leagueId, input.leagueId), eq(leaguePlayers.username, input.username))).limit(1);
+  const playerName = account.name?.trim().slice(0, 120) || `Player ${input.playerId}`;
+  const username = `player_${input.playerId}`;
+  const duplicateUsername = await db.select({ id: leaguePlayers.id }).from(leaguePlayers).where(and(eq(leaguePlayers.leagueId, input.leagueId), eq(leaguePlayers.username, username))).limit(1);
   if (duplicateUsername[0]) throw new TRPCError({ code: "CONFLICT", message: "That username is already in use in this league." });
-  const result = await db.insert(leaguePlayers).values({ leagueId: input.leagueId, userId: account.id, playerName: input.playerName, username: input.username, profilePicture: input.profilePicture || null, whatsappNumber: input.whatsappNumber || null, registrationStatus: "pending" });
+  const result = await db.insert(leaguePlayers).values({ leagueId: input.leagueId, userId: account.id, playerName, username, registrationStatus: "pending" });
   return { id: Number(result[0].insertId) };
 }
 
@@ -127,7 +145,7 @@ export async function teamPage(teamId: number, userId: number) {
   const [teamRowsInLeague, fixtureRows, players] = await Promise.all([
     db.select().from(teams).where(eq(teams.leagueId, league.id)),
     db.select().from(fixtures).where(eq(fixtures.leagueId, league.id)),
-    db.select({ membership: leaguePlayers, user: users }).from(leaguePlayers).innerJoin(users, eq(users.id, leaguePlayers.userId)).where(and(eq(leaguePlayers.leagueId, league.id), eq(leaguePlayers.teamId, teamId), eq(leaguePlayers.registrationStatus, "approved"))),
+    db.select({ membership: leaguePlayers, user: { playerId: users.playerId, name: users.name } }).from(leaguePlayers).innerJoin(users, eq(users.id, leaguePlayers.userId)).where(and(eq(leaguePlayers.leagueId, league.id), eq(leaguePlayers.teamId, teamId), eq(leaguePlayers.registrationStatus, "approved"))),
   ]);
   const standings = calculateStandings(teamRowsInLeague, fixtureRows);
   return { team, league, standing: standings.find((standing) => standing.teamId === teamId) ?? null, players };

@@ -23,11 +23,12 @@ describeWithDatabase("player registration and permissions", () => {
     const adminOpenId = `player-admin-${suffix}`;
     const playerOpenId = `player-user-${suffix}`;
     const joinerOpenId = `player-joiner-${suffix}`;
+    const basePlayerId = 100000 + (Date.now() % 700000);
     createdOpenIds.push(adminOpenId, playerOpenId, joinerOpenId);
     await db.insert(users).values([
-      { openId: adminOpenId, name: "Player Admin", email: `${adminOpenId}@example.test`, loginMethod: "test" },
-      { openId: playerOpenId, name: "Player User", email: `${playerOpenId}@example.test`, loginMethod: "test" },
-      { openId: joinerOpenId, name: "League Joiner", email: `${joinerOpenId}@example.test`, loginMethod: "test" },
+      { openId: adminOpenId, playerId: basePlayerId, name: "Player Admin", email: `${adminOpenId}@example.test`, loginMethod: "test" },
+      { openId: playerOpenId, playerId: basePlayerId + 1, name: "Player User", email: `${playerOpenId}@example.test`, loginMethod: "test" },
+      { openId: joinerOpenId, playerId: basePlayerId + 2, name: "League Joiner", email: `${joinerOpenId}@example.test`, loginMethod: "test" },
     ]);
     const rows = await db.select().from(users).where(or(eq(users.openId, adminOpenId), eq(users.openId, playerOpenId), eq(users.openId, joinerOpenId)));
     const admin = rows.find((row) => row.openId === adminOpenId);
@@ -47,11 +48,17 @@ describeWithDatabase("player registration and permissions", () => {
     const leagueDashboard = await adminCaller.league.dashboard({ leagueId });
     const alpha = leagueDashboard.teams.find((team) => team.name === "Alpha");
     if (!alpha) throw new Error("Expected Alpha team.");
-    const registration = await adminCaller.playerAdmin.add({ leagueId, email: player.email!, playerName: "Player One", username: `player_one_${suffix}` });
-    expect((await adminCaller.playerAdmin.list({ leagueId }))[0]?.membership.registrationStatus).toBe("pending");
+    const registration = await adminCaller.playerAdmin.add({ leagueId, playerId: player.playerId });
+    const registeredPlayers = await adminCaller.playerAdmin.list({ leagueId });
+    expect(registeredPlayers[0]?.membership.registrationStatus).toBe("pending");
+    expect(registeredPlayers[0]?.user.playerId).toBe(player.playerId);
+    expect("email" in registeredPlayers[0]!.user).toBe(false);
     await adminCaller.playerAdmin.review({ membershipId: registration.id, registrationStatus: "approved", teamId: alpha.id });
     await adminCaller.league.generateFixtures({ leagueId });
     const playerView = await playerCaller.player.dashboard();
+    expect(await playerCaller.player.profile()).toMatchObject({ playerId: player.playerId, playerName: "Player User" });
+    expect(await adminCaller.playerAdmin.findPlayer({ playerId: player.playerId })).toEqual({ playerId: player.playerId, playerName: "Player User" });
+    await expect(adminCaller.playerAdmin.findPlayer({ playerId: 999999 })).rejects.toMatchObject({ code: "NOT_FOUND", message: "Player not found for Player ID 999999. Check the number and try again." });
     const foundLeague = await playerCaller.player.findLeague({ leagueId });
     expect(foundLeague).toMatchObject({ id: leagueId, name: "Player Test League" });
     await expect(playerCaller.player.findLeague({ leagueId: 999999999 })).rejects.toMatchObject({ code: "NOT_FOUND", message: "No league was found with ID 999999999. Check the number and try again." });
@@ -65,6 +72,6 @@ describeWithDatabase("player registration and permissions", () => {
     await expect(playerCaller.league.generateFixtures({ leagueId })).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(playerCaller.league.update({ leagueId, name: "Hijacked", seasonName: "Nope", numberOfTeams: 2 })).rejects.toMatchObject({ code: "NOT_FOUND" });
     const teamView = await playerCaller.player.team({ teamId: alpha.id });
-    expect(teamView.players[0]?.membership.username).toBe(`player_one_${suffix}`);
+    expect(teamView.players[0]?.membership.username).toBe(`player_${player.playerId}`);
   });
 });

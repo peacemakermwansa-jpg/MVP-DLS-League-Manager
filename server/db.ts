@@ -1,9 +1,21 @@
+import { randomInt } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+
+type UpsertUser = Omit<InsertUser, "playerId"> & { playerId?: number };
+
+async function generatePlayerId(db: ReturnType<typeof drizzle>) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const candidate = randomInt(100000, 1000000);
+    const rows = await db.select({ id: users.id }).from(users).where(eq(users.playerId, candidate)).limit(1);
+    if (!rows[0]) return candidate;
+  }
+  throw new Error("Could not allocate a unique Player ID.");
+}
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
@@ -18,7 +30,7 @@ export async function getDb() {
   return _db;
 }
 
-export async function upsertUser(user: InsertUser): Promise<void> {
+export async function upsertUser(user: UpsertUser): Promise<void> {
   if (!user.openId) {
     throw new Error("User openId is required for upsert");
   }
@@ -30,7 +42,9 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 
   try {
-    const values: InsertUser = { openId: user.openId };
+    const existing = await db.select({ playerId: users.playerId }).from(users).where(eq(users.openId, user.openId)).limit(1);
+    const playerId = existing[0]?.playerId ?? user.playerId ?? await generatePlayerId(db);
+    const values: InsertUser = { openId: user.openId, playerId };
     const updateSet: Record<string, unknown> = {};
     const textFields = ["name", "email", "loginMethod"] as const;
     type TextField = (typeof textFields)[number];

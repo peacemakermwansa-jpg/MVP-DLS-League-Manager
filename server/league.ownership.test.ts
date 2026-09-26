@@ -32,10 +32,11 @@ describeWithDatabase("league ownership flow", () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const accountAOpenId = `ownership-a-${suffix}`;
     const accountBOpenId = `ownership-b-${suffix}`;
+    const basePlayerId = 100000 + (Date.now() % 700000);
     createdOpenIds.push(accountAOpenId, accountBOpenId);
     await db.insert(users).values([
-      { openId: accountAOpenId, name: "Account A", email: `${accountAOpenId}@example.test`, loginMethod: "test" },
-      { openId: accountBOpenId, name: "Account B", email: `${accountBOpenId}@example.test`, loginMethod: "test" },
+      { openId: accountAOpenId, playerId: basePlayerId, name: "Account A", email: `${accountAOpenId}@example.test`, loginMethod: "test" },
+      { openId: accountBOpenId, playerId: basePlayerId + 1, name: "Account B", email: `${accountBOpenId}@example.test`, loginMethod: "test" },
     ]);
     const accountRows = await db.select().from(users).where(orUserIds(accountAOpenId, accountBOpenId));
     const accountA = accountRows.find((user) => user.openId === accountAOpenId);

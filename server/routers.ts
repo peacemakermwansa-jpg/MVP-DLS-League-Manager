@@ -8,11 +8,12 @@ import {
   recordResult, removeTeam, updateLeague, updateTeam,
 } from "./league";
 import {
-  addPlayerByEmail, applyToLeague, findLeague, listLeaguePlayers, playerDashboard, removePlayer,
+  addPlayerByPlayerId, applyToLeague, findLeague, findPlayerByPlayerId, listLeaguePlayers, playerDashboard, playerProfile, removePlayer,
   reviewPlayer, teamPage, updateOwnProfile,
 } from "./players";
 
 const leagueIdInput = z.object({ leagueId: z.number().int().positive() });
+const playerIdInput = z.object({ playerId: z.number().int().min(100000).max(999999) });
 const teamDetails = z.object({ name: z.string().trim().min(2).max(120), managerName: z.string().trim().min(2).max(120), logoUrl: z.string().trim().url().max(500).optional().or(z.literal("")) });
 const leagueDetails = z.object({ name: z.string().trim().min(2).max(120), seasonName: z.string().trim().min(2).max(120), numberOfTeams: z.number().int().min(2).max(32) });
 const playerDetails = z.object({ playerName: z.string().trim().min(2).max(120), username: z.string().trim().min(2).max(64).regex(/^[a-zA-Z0-9_.-]+$/), profilePicture: z.string().trim().url().max(500).optional().or(z.literal("")), whatsappNumber: z.string().trim().max(32).optional().or(z.literal("")) });
@@ -36,6 +37,7 @@ export const appRouter = router({
     recordResult: protectedProcedure.input(z.object({ fixtureId: z.number().int().positive(), homeScore: z.number().int().min(0).max(99), awayScore: z.number().int().min(0).max(99) })).mutation(({ ctx, input }) => recordResult({ ...input, userId: ctx.user.id })),
   }),
   player: router({
+    profile: protectedProcedure.query(({ ctx }) => playerProfile(ctx.user.id)),
     dashboard: protectedProcedure.query(({ ctx }) => playerDashboard(ctx.user.id)),
     findLeague: protectedProcedure.input(leagueIdInput).query(({ input }) => findLeague(input.leagueId)),
     register: protectedProcedure.input(leagueIdInput.merge(playerDetails)).mutation(({ ctx, input }) => applyToLeague({ ...input, userId: ctx.user.id })),
@@ -44,7 +46,8 @@ export const appRouter = router({
   }),
   playerAdmin: router({
     list: protectedProcedure.input(leagueIdInput).query(({ ctx, input }) => listLeaguePlayers(input.leagueId, ctx.user.id)),
-    add: protectedProcedure.input(leagueIdInput.extend({ email: z.string().trim().email() }).merge(playerDetails)).mutation(({ ctx, input }) => addPlayerByEmail({ ...input, userId: ctx.user.id })),
+    findPlayer: protectedProcedure.input(playerIdInput).query(({ input }) => findPlayerByPlayerId(input.playerId)),
+    add: protectedProcedure.input(leagueIdInput.merge(playerIdInput)).mutation(({ ctx, input }) => addPlayerByPlayerId({ ...input, userId: ctx.user.id })),
     review: protectedProcedure.input(z.object({ membershipId: z.number().int().positive(), registrationStatus: z.enum(["approved", "rejected"]), teamId: z.number().int().positive().nullable().optional() })).mutation(({ ctx, input }) => reviewPlayer({ ...input, userId: ctx.user.id })),
     remove: protectedProcedure.input(z.object({ membershipId: z.number().int().positive() })).mutation(({ ctx, input }) => removePlayer(input.membershipId, ctx.user.id)),
   }),
