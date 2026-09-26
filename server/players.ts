@@ -21,6 +21,13 @@ async function getMembership(db: Awaited<ReturnType<typeof requireDb>>, leagueId
   return rows[0];
 }
 
+export async function findLeague(leagueId: number) {
+  const db = await requireDb();
+  const rows = await db.select({ id: leagues.id, name: leagues.name, seasonName: leagues.seasonName, numberOfTeams: leagues.numberOfTeams }).from(leagues).where(eq(leagues.id, leagueId)).limit(1);
+  if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: `No league was found with ID ${leagueId}. Check the number and try again.` });
+  return rows[0];
+}
+
 export async function applyToLeague(input: { leagueId: number; playerName: string; username: string; profilePicture?: string; whatsappNumber?: string; userId: number }) {
   const db = await requireDb();
   const leagueRows = await db.select({ id: leagues.id }).from(leagues).where(eq(leagues.id, input.leagueId)).limit(1);

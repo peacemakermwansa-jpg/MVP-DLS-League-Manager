@@ -8,7 +8,7 @@ import {
   recordResult, removeTeam, updateLeague, updateTeam,
 } from "./league";
 import {
-  addPlayerByEmail, applyToLeague, listLeaguePlayers, playerDashboard, removePlayer,
+  addPlayerByEmail, applyToLeague, findLeague, listLeaguePlayers, playerDashboard, removePlayer,
   reviewPlayer, teamPage, updateOwnProfile,
 } from "./players";
 
@@ -37,6 +37,7 @@ export const appRouter = router({
   }),
   player: router({
     dashboard: protectedProcedure.query(({ ctx }) => playerDashboard(ctx.user.id)),
+    findLeague: protectedProcedure.input(leagueIdInput).query(({ input }) => findLeague(input.leagueId)),
     register: protectedProcedure.input(leagueIdInput.merge(playerDetails)).mutation(({ ctx, input }) => applyToLeague({ ...input, userId: ctx.user.id })),
     updateProfile: protectedProcedure.input(playerDetails.extend({ membershipId: z.number().int().positive() })).mutation(({ ctx, input }) => updateOwnProfile({ ...input, userId: ctx.user.id })),
     team: protectedProcedure.input(z.object({ teamId: z.number().int().positive() })).query(({ ctx, input }) => teamPage(input.teamId, ctx.user.id)),

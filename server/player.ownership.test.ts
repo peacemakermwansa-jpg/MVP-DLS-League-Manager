@@ -22,18 +22,26 @@ describeWithDatabase("player registration and permissions", () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const adminOpenId = `player-admin-${suffix}`;
     const playerOpenId = `player-user-${suffix}`;
-    createdOpenIds.push(adminOpenId, playerOpenId);
+    const joinerOpenId = `player-joiner-${suffix}`;
+    createdOpenIds.push(adminOpenId, playerOpenId, joinerOpenId);
     await db.insert(users).values([
       { openId: adminOpenId, name: "Player Admin", email: `${adminOpenId}@example.test`, loginMethod: "test" },
       { openId: playerOpenId, name: "Player User", email: `${playerOpenId}@example.test`, loginMethod: "test" },
+      { openId: joinerOpenId, name: "League Joiner", email: `${joinerOpenId}@example.test`, loginMethod: "test" },
     ]);
-    const rows = await db.select().from(users).where(or(eq(users.openId, adminOpenId), eq(users.openId, playerOpenId)));
+    const rows = await db.select().from(users).where(or(eq(users.openId, adminOpenId), eq(users.openId, playerOpenId), eq(users.openId, joinerOpenId)));
     const admin = rows.find((row) => row.openId === adminOpenId);
     const player = rows.find((row) => row.openId === playerOpenId);
-    if (!admin || !player) throw new Error("Test users were not created.");
+    const joiner = rows.find((row) => row.openId === joinerOpenId);
+    if (!admin || !player || !joiner) throw new Error("Test users were not created.");
     const adminCaller = appRouter.createCaller(contextFor(admin));
     const playerCaller = appRouter.createCaller(contextFor(player));
+    const joinerCaller = appRouter.createCaller(contextFor(joiner));
     const { id: leagueId } = await adminCaller.league.create({ name: "Player Test League", seasonName: "Player Season", numberOfTeams: 2 });
+    const secondLeague = await adminCaller.league.create({ name: "Second Test League", seasonName: "Player Season", numberOfTeams: 2 });
+    expect(Number.isInteger(leagueId)).toBe(true);
+    expect(leagueId).toBeGreaterThan(0);
+    expect(secondLeague.id).not.toBe(leagueId);
     await adminCaller.league.addTeam({ leagueId, name: "Alpha", managerName: "Coach Alpha" });
     await adminCaller.league.addTeam({ leagueId, name: "Bravo", managerName: "Coach Bravo" });
     const leagueDashboard = await adminCaller.league.dashboard({ leagueId });
@@ -44,6 +52,12 @@ describeWithDatabase("player registration and permissions", () => {
     await adminCaller.playerAdmin.review({ membershipId: registration.id, registrationStatus: "approved", teamId: alpha.id });
     await adminCaller.league.generateFixtures({ leagueId });
     const playerView = await playerCaller.player.dashboard();
+    const foundLeague = await playerCaller.player.findLeague({ leagueId });
+    expect(foundLeague).toMatchObject({ id: leagueId, name: "Player Test League" });
+    await expect(playerCaller.player.findLeague({ leagueId: 999999999 })).rejects.toMatchObject({ code: "NOT_FOUND", message: "No league was found with ID 999999999. Check the number and try again." });
+    const joinRegistration = await joinerCaller.player.register({ leagueId, playerName: "League Joiner", username: `league_joiner_${suffix}` });
+    expect(joinRegistration.id).toBeGreaterThan(0);
+    expect((await adminCaller.playerAdmin.list({ leagueId })).some(({ membership }) => membership.id === joinRegistration.id)).toBe(true);
     expect(playerView[0]).toMatchObject({ league: { id: leagueId }, team: { id: alpha.id }, membership: { registrationStatus: "approved" } });
     expect(playerView[0]?.standing).toMatchObject({ teamName: "Alpha", played: 0, points: 0 });
     expect(playerView[0]?.fixtures).toHaveLength(2);

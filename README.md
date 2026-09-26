@@ -137,3 +137,10 @@ client/src/components/TeamPage.tsx             Protected team detail page
 The new database migration is `drizzle/0003_neat_goblin_queen.sql`. It creates `leaguePlayers`, adds the nullable fixture `deadline`, and adds foreign keys to leagues, users, and teams.
 
 The current first-stage invitation flow requires the player to have created an account before the owner adds them by email. Email/WhatsApp notifications and a separate invitation-token workflow remain intentionally out of scope until the core player registry is stable.
+
+
+## League ID sharing
+
+Every league uses its database-backed `leagues.id` as its unique numeric League ID. Because the column is an auto-increment primary key, new leagues cannot receive the same ID, and existing leagues retain valid numeric IDs. Owners can see the ID on the overview and League management screens and copy it with the **Copy League ID** button. Players enter that exact ID in **Join a league**; MVP verifies the league before enabling the registration request and shows a clear error for an unknown ID.
+
+The player registration integration test covers numeric ID generation, uniqueness across created leagues, valid lookup, self-registration with the exact ID, and invalid-ID rejection.

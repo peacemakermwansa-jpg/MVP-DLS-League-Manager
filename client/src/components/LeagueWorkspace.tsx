@@ -12,6 +12,7 @@ import {
   CircleCheck,
   CircleHelp,
   Clock3,
+  Copy,
   Crown,
   ListChecks,
   Pencil,
@@ -78,6 +79,15 @@ function SectionHeading({ eyebrow, title, description, action }: { eyebrow: stri
         {description && <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>}
       </div>
       {action}
+    </div>
+  );
+}
+
+function LeagueIdControl({ leagueId, copied, onCopy }: { leagueId: number; copied: boolean; onCopy: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3">
+      <div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">League ID</p><p className="number-display mt-1 text-2xl font-bold tracking-tight">{leagueId}</p></div>
+      <Button type="button" variant="outline" size="sm" className="rounded-xl bg-background" onClick={onCopy}>{copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? "Copied" : "Copy League ID"}</Button>
     </div>
   );
 }
@@ -152,6 +162,7 @@ export default function LeagueWorkspace() {
   const [teamForm, setTeamForm] = useState<TeamForm>(EMPTY_TEAM_FORM);
   const [editingTeamId, setEditingTeamId] = useState<number | null>(null);
   const [resultForm, setResultForm] = useState({ fixtureId: "", homeScore: "", awayScore: "" });
+  const [copiedLeagueId, setCopiedLeagueId] = useState<number | null>(null);
 
   const overviewQuery = trpc.league.overview.useQuery(undefined, { refetchOnWindowFocus: false });
   const leagueSummaries = overviewQuery.data ?? [];
@@ -273,6 +284,17 @@ export default function LeagueWorkspace() {
     else createLeagueMutation.mutate(input);
   };
 
+  const copyLeagueId = async (leagueId: number) => {
+    try {
+      await navigator.clipboard.writeText(String(leagueId));
+      setCopiedLeagueId(leagueId);
+      toast.success("League ID copied.");
+      window.setTimeout(() => setCopiedLeagueId((current) => current === leagueId ? null : current), 1800);
+    } catch {
+      toast.error("Could not copy the League ID. Please copy it manually.");
+    }
+  };
+
   const handleSaveTeam = (event: FormEvent) => {
     event.preventDefault();
     if (!activeId) return toast.error("Create or select a league first.");
@@ -331,6 +353,7 @@ export default function LeagueWorkspace() {
   const renderOverview = () => (
     <>
       <SectionHeading eyebrow="Overview" title={activeLeague ? `${activeLeague.name} is in your hands.` : "Your league command center."} description={activeLeague ? `${activeLeague.seasonName} · Keep registration, fixtures, results, and the table moving from one place.` : "Create your first DLS league to turn a blank season into a managed competition."} action={<Button onClick={() => setLocation("/leagues")} className="h-11 rounded-xl font-bold"><Plus className="size-4" /> New league</Button>} />
+      {activeLeague && <div className="mt-5 max-w-sm"><LeagueIdControl leagueId={activeLeague.id} copied={copiedLeagueId === activeLeague.id} onCopy={() => copyLeagueId(activeLeague.id)} /></div>}
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Teams registered" value={`${teams.length}/${activeLeague?.numberOfTeams ?? "—"}`} detail={activeLeague ? "League registration" : "Select a league"} icon={Users} />
         <StatCard label="Fixtures" value={stats.fixtureTotal} detail={`${upcomingFixtures.length} upcoming`} icon={CalendarDays} />
@@ -370,9 +393,9 @@ export default function LeagueWorkspace() {
               <div key={league.id} className={`flex flex-col gap-4 rounded-2xl border p-4 transition-all sm:flex-row sm:items-center sm:justify-between ${activeId === league.id ? "border-primary/50 bg-primary/5" : "border-border/80 hover:border-primary/30"}`}>
                 <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => { setActiveLeagueId(league.id); setLocation("/"); }}>
                   <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-secondary text-xs font-bold">{initials(league.name)}</div>
-                  <div className="min-w-0"><p className="truncate font-bold">{league.name}</p><p className="mt-1 text-sm text-muted-foreground">{league.seasonName} · {league.teamCount}/{league.numberOfTeams} teams</p></div>
+                  <div className="min-w-0"><p className="truncate font-bold">{league.name}</p><p className="mt-1 text-sm text-muted-foreground">{league.seasonName} · {league.teamCount}/{league.numberOfTeams} teams · ID {league.id}</p></div>
                 </button>
-                <div className="flex items-center justify-between gap-4 sm:justify-end"><div className="flex items-center gap-4 text-xs text-muted-foreground"><span><strong className="text-foreground">{league.teamCount}</strong> teams</span><span><strong className="text-foreground">{league.completedFixtureCount}</strong> results</span></div><div className="flex gap-1"><Button variant="ghost" size="icon-sm" onClick={() => { setActiveLeagueId(league.id); setEditingLeagueId(league.id); setLeagueForm({ name: league.name, seasonName: league.seasonName, numberOfTeams: String(league.numberOfTeams) }); }} aria-label={`Edit ${league.name}`}><Pencil className="size-4" /></Button><Button variant="ghost" size="icon-sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => { if (window.confirm(`Delete ${league.name}? This removes its teams, fixtures, and results.`)) deleteLeagueMutation.mutate({ leagueId: league.id }); }} aria-label={`Delete ${league.name}`}><Trash2 className="size-4" /></Button></div></div>
+                <div className="flex items-center justify-between gap-4 sm:justify-end"><div className="flex items-center gap-4 text-xs text-muted-foreground"><span><strong className="text-foreground">{league.teamCount}</strong> teams</span><span><strong className="text-foreground">{league.completedFixtureCount}</strong> results</span></div><div className="flex gap-1"><Button variant="outline" size="sm" className="rounded-xl" onClick={() => copyLeagueId(league.id)}>{copiedLeagueId === league.id ? <Check className="size-4" /> : <Copy className="size-4" />}<span className="hidden sm:inline">{copiedLeagueId === league.id ? "Copied" : "Copy ID"}</span></Button><Button variant="ghost" size="icon-sm" onClick={() => { setActiveLeagueId(league.id); setEditingLeagueId(league.id); setLeagueForm({ name: league.name, seasonName: league.seasonName, numberOfTeams: String(league.numberOfTeams) }); }} aria-label={`Edit ${league.name}`}><Pencil className="size-4" /></Button><Button variant="ghost" size="icon-sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => { if (window.confirm(`Delete ${league.name}? This removes its teams, fixtures, and results.`)) deleteLeagueMutation.mutate({ leagueId: league.id }); }} aria-label={`Delete ${league.name}`}><Trash2 className="size-4" /></Button></div></div>
               </div>
             )) : <EmptyState icon={Trophy} title="Start with one competition" description="A league holds its season name, team limit, fixtures, results, and table in one place." />}
           </CardContent>
