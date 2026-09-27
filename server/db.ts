@@ -17,6 +17,11 @@ async function generatePlayerId(db: ReturnType<typeof drizzle>) {
   throw new Error("Could not allocate a unique Player ID.");
 }
 
+function isDuplicateKeyError(error: unknown) {
+  const candidate = error as { code?: string; errno?: number };
+  return candidate.code === "ER_DUP_ENTRY" || candidate.errno === 1062;
+}
+
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -42,9 +47,6 @@ export async function upsertUser(user: UpsertUser): Promise<void> {
   }
 
   try {
-    const existing = await db.select({ playerId: users.playerId }).from(users).where(eq(users.openId, user.openId)).limit(1);
-    const playerId = existing[0]?.playerId ?? user.playerId ?? await generatePlayerId(db);
-    const values: InsertUser = { openId: user.openId, playerId };
     const updateSet: Record<string, unknown> = {};
     const textFields = ["name", "email", "loginMethod"] as const;
     type TextField = (typeof textFields)[number];
@@ -53,26 +55,39 @@ export async function upsertUser(user: UpsertUser): Promise<void> {
       const value = user[field];
       if (value === undefined) return;
       const normalized = value ?? null;
-      values[field] = normalized;
       updateSet[field] = normalized;
     };
 
     textFields.forEach(assignNullable);
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
+    if (user.lastSignedIn !== undefined) updateSet.lastSignedIn = user.lastSignedIn;
     if (user.role !== undefined) {
-      values.role = user.role;
       updateSet.role = user.role;
     } else if (user.openId === ENV.ownerOpenId) {
-      values.role = "admin";
       updateSet.role = "admin";
     }
-    if (!values.lastSignedIn) values.lastSignedIn = new Date();
     if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+    const existing = await db.select({ playerId: users.playerId }).from(users).where(eq(users.openId, user.openId)).limit(1);
+    if (existing[0]) {
+      await db.update(users).set(updateSet).where(eq(users.openId, user.openId));
+      return;
+    }
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const playerId = user.playerId ?? await generatePlayerId(db);
+      try {
+        await db.insert(users).values({ openId: user.openId, playerId, ...updateSet });
+        return;
+      } catch (error) {
+        if (!isDuplicateKeyError(error)) throw error;
+        const racedUser = await db.select({ playerId: users.playerId }).from(users).where(eq(users.openId, user.openId)).limit(1);
+        if (racedUser[0]) {
+          await db.update(users).set(updateSet).where(eq(users.openId, user.openId));
+          return;
+        }
+      }
+    }
+    throw new Error("Could not create the user account without a unique Player ID.");
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
     throw error;

@@ -9,7 +9,7 @@ import {
 } from "./league";
 import {
   addPlayerByPlayerId, applyToLeague, findLeague, findPlayerByPlayerId, listLeaguePlayers, playerDashboard, playerProfile, removePlayer,
-  reviewPlayer, teamPage, updateOwnProfile,
+  assignPlayerTeam, reviewPlayer, teamPage, updateOwnProfile,
 } from "./players";
 
 const leagueIdInput = z.object({ leagueId: z.number().int().positive() });
@@ -46,8 +46,9 @@ export const appRouter = router({
   }),
   playerAdmin: router({
     list: protectedProcedure.input(leagueIdInput).query(({ ctx, input }) => listLeaguePlayers(input.leagueId, ctx.user.id)),
-    findPlayer: protectedProcedure.input(playerIdInput).query(({ input }) => findPlayerByPlayerId(input.playerId)),
+    findPlayer: protectedProcedure.input(leagueIdInput.merge(playerIdInput)).query(({ ctx, input }) => findPlayerByPlayerId({ ...input, userId: ctx.user.id })),
     add: protectedProcedure.input(leagueIdInput.merge(playerIdInput)).mutation(({ ctx, input }) => addPlayerByPlayerId({ ...input, userId: ctx.user.id })),
+    assignTeam: protectedProcedure.input(z.object({ membershipId: z.number().int().positive(), teamId: z.number().int().positive().nullable() })).mutation(({ ctx, input }) => assignPlayerTeam({ ...input, userId: ctx.user.id })),
     review: protectedProcedure.input(z.object({ membershipId: z.number().int().positive(), registrationStatus: z.enum(["approved", "rejected"]), teamId: z.number().int().positive().nullable().optional() })).mutation(({ ctx, input }) => reviewPlayer({ ...input, userId: ctx.user.id })),
     remove: protectedProcedure.input(z.object({ membershipId: z.number().int().positive() })).mutation(({ ctx, input }) => removePlayer(input.membershipId, ctx.user.id)),
   }),

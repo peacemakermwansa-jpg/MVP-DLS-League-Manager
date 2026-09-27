@@ -53,12 +53,16 @@ describeWithDatabase("player registration and permissions", () => {
     expect(registeredPlayers[0]?.membership.registrationStatus).toBe("pending");
     expect(registeredPlayers[0]?.user.playerId).toBe(player.playerId);
     expect("email" in registeredPlayers[0]!.user).toBe(false);
+    await adminCaller.playerAdmin.assignTeam({ membershipId: registration.id, teamId: alpha.id });
+    expect((await adminCaller.playerAdmin.list({ leagueId }))[0]?.membership).toMatchObject({ registrationStatus: "pending", teamId: alpha.id });
     await adminCaller.playerAdmin.review({ membershipId: registration.id, registrationStatus: "approved", teamId: alpha.id });
     await adminCaller.league.generateFixtures({ leagueId });
     const playerView = await playerCaller.player.dashboard();
     expect(await playerCaller.player.profile()).toMatchObject({ playerId: player.playerId, playerName: "Player User" });
-    expect(await adminCaller.playerAdmin.findPlayer({ playerId: player.playerId })).toEqual({ playerId: player.playerId, playerName: "Player User" });
-    await expect(adminCaller.playerAdmin.findPlayer({ playerId: 999999 })).rejects.toMatchObject({ code: "NOT_FOUND", message: "Player not found for Player ID 999999. Check the number and try again." });
+    expect(await adminCaller.playerAdmin.findPlayer({ leagueId, playerId: player.playerId })).toEqual({ playerId: player.playerId, playerName: "Player User" });
+    await expect(adminCaller.playerAdmin.findPlayer({ leagueId, playerId: 999999 })).rejects.toMatchObject({ code: "NOT_FOUND", message: "Player not found for Player ID 999999. Check the number and try again." });
+    await expect(playerCaller.playerAdmin.findPlayer({ leagueId, playerId: player.playerId })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(playerCaller.playerAdmin.assignTeam({ membershipId: registration.id, teamId: alpha.id })).rejects.toMatchObject({ code: "NOT_FOUND" });
     const foundLeague = await playerCaller.player.findLeague({ leagueId });
     expect(foundLeague).toMatchObject({ id: leagueId, name: "Player Test League" });
     await expect(playerCaller.player.findLeague({ leagueId: 999999999 })).rejects.toMatchObject({ code: "NOT_FOUND", message: "No league was found with ID 999999999. Check the number and try again." });

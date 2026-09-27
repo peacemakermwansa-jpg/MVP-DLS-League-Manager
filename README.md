@@ -152,3 +152,10 @@ The Player Centre displays the signed-in user's Player ID with a copy action. Th
 Every league uses its database-backed `leagues.id` as its unique numeric League ID. Because the column is an auto-increment primary key, new leagues cannot receive the same ID, and existing leagues retain valid numeric IDs. Owners can see the ID on the overview and League management screens and copy it with the **Copy League ID** button. Players enter that exact ID in **Join a league**; MVP verifies the league before enabling the registration request and shows a clear error for an unknown ID.
 
 The player registration integration test covers numeric ID generation, uniqueness across created leagues, valid lookup, self-registration with the exact ID, and invalid-ID rejection.
+
+## Audit repairs
+
+- Player ID lookup is now scoped to the authenticated owner of the selected league, preventing arbitrary account enumeration by other signed-in users.
+- Team assignment has its own owner-authorized procedure and no longer silently approves a pending registration when an administrator changes a team.
+- OAuth user upserts now include a race-safe unique Player ID creation path and preserve the existing ID on later sign-ins.
+- Regression coverage verifies cross-user lookup denial and that assignment preserves pending status.

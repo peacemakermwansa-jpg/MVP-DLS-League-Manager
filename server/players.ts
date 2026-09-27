@@ -28,11 +28,12 @@ export async function findLeague(leagueId: number) {
   return rows[0];
 }
 
-export async function findPlayerByPlayerId(playerId: number) {
+export async function findPlayerByPlayerId(input: { leagueId: number; playerId: number; userId: number }) {
   const db = await requireDb();
-  const rows = await db.select({ playerId: users.playerId, playerName: users.name }).from(users).where(eq(users.playerId, playerId)).limit(1);
+  await requireOwnedLeague(db, input.leagueId, input.userId);
+  const rows = await db.select({ playerId: users.playerId, playerName: users.name }).from(users).where(eq(users.playerId, input.playerId)).limit(1);
   const player = rows[0];
-  if (!player) throw new TRPCError({ code: "NOT_FOUND", message: `Player not found for Player ID ${playerId}. Check the number and try again.` });
+  if (!player) throw new TRPCError({ code: "NOT_FOUND", message: `Player not found for Player ID ${input.playerId}. Check the number and try again.` });
   return { playerId: player.playerId, playerName: player.playerName?.trim() || `Player ${player.playerId}` };
 }
 
@@ -119,6 +120,20 @@ export async function reviewPlayer(input: { membershipId: number; registrationSt
     if (!teamRows[0]) throw new TRPCError({ code: "BAD_REQUEST", message: "That team does not belong to this league." });
   }
   await db.update(leaguePlayers).set({ registrationStatus: input.registrationStatus, teamId: input.registrationStatus === "approved" ? (input.teamId ?? membership.teamId) : null }).where(eq(leaguePlayers.id, input.membershipId));
+  return { success: true } as const;
+}
+
+export async function assignPlayerTeam(input: { membershipId: number; teamId: number | null; userId: number }) {
+  const db = await requireDb();
+  const rows = await db.select().from(leaguePlayers).where(eq(leaguePlayers.id, input.membershipId)).limit(1);
+  const membership = rows[0];
+  if (!membership) throw new TRPCError({ code: "NOT_FOUND", message: "Player registration not found." });
+  await requireOwnedLeague(db, membership.leagueId, input.userId);
+  if (input.teamId != null) {
+    const teamRows = await db.select({ id: teams.id }).from(teams).where(and(eq(teams.id, input.teamId), eq(teams.leagueId, membership.leagueId))).limit(1);
+    if (!teamRows[0]) throw new TRPCError({ code: "BAD_REQUEST", message: "That team does not belong to this league." });
+  }
+  await db.update(leaguePlayers).set({ teamId: input.teamId }).where(eq(leaguePlayers.id, input.membershipId));
   return { success: true } as const;
 }
 
