@@ -1,0 +1,42 @@
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { trpc } from "@/lib/trpc";
+import { Check, Clock3, FileImage, Flag, ShieldAlert, Upload, X } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+
+function errorText(error: { message?: string }) { return error.message || "Something went wrong."; }
+function formatDeadline(value: Date | string | null) { return value ? new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "No deadline set"; }
+function statusLabel(status: string) { return status === "result_submitted" ? "Result submitted" : status === "confirmed" ? "Confirmed" : status === "disputed" ? "Disputed" : "Scheduled"; }
+function statusVariant(status: string) { return status === "confirmed" ? "default" as const : status === "disputed" ? "destructive" as const : "secondary" as const; }
+
+export default function PlayerMatchCenter() {
+  const fixtures = trpc.player.fixtures.useQuery(undefined, { refetchOnWindowFocus: false });
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [scores, setScores] = useState({ home: "", away: "", proofData: "" });
+  const submit = trpc.player.submitResult.useMutation({ onSuccess: async () => { toast.success("Result submitted — waiting for opponent confirmation."); setSelectedId(null); setScores({ home: "", away: "", proofData: "" }); await fixtures.refetch(); }, onError: (error) => toast.error(errorText(error)) });
+  const confirm = trpc.player.confirmResult.useMutation({ onSuccess: async () => { toast.success("Result confirmed. The league table is updated."); await fixtures.refetch(); }, onError: (error) => toast.error(errorText(error)) });
+  const dispute = trpc.player.disputeResult.useMutation({ onSuccess: async () => { toast.error("Result disputed. The league administrator has been notified."); await fixtures.refetch(); }, onError: (error) => toast.error(errorText(error)) });
+  const rows = fixtures.data ?? [];
+  const handleProof = (file: File | undefined) => {
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      toast.error("Choose a PNG, JPEG, or WebP image up to 5 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setScores((current) => ({ ...current, proofData: String(reader.result) }));
+    reader.readAsDataURL(file);
+  };
+  const submitResult = (fixtureId: number) => {
+    if (scores.home === "" || scores.away === "") return toast.error("Enter both scores.");
+    submit.mutate({ fixtureId, homeScore: Number(scores.home), awayScore: Number(scores.away), proofData: scores.proofData || undefined });
+  };
+  return <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-8 sm:py-10">
+    <div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">Player match centre</p><h1 className="mt-2 text-3xl font-bold tracking-tight">Play the match. Confirm the result.</h1><p className="mt-2 text-sm text-muted-foreground">Only fixtures involving your approved team appear here. Pending and disputed results never change the official table.</p></div>
+    {fixtures.isLoading ? <p className="mt-8 text-sm text-muted-foreground">Loading your fixtures…</p> : !rows.length ? <Card className="mt-8 rounded-[22px] border-border/80 shadow-none"><CardContent className="grid place-items-center gap-3 p-12 text-center"><Flag className="size-9 text-primary" /><h2 className="text-xl font-bold">No player fixtures yet</h2><p className="max-w-md text-sm text-muted-foreground">Get approved and assigned to a team in a league before matches can appear here.</p></CardContent></Card> : <div className="mt-8 grid gap-5">{rows.map((fixture) => <Card key={fixture.id} className="rounded-[22px] border-border/80 shadow-none"><CardHeader className="border-b border-border/70"><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><CardTitle>{fixture.homeTeam.name} <span className="text-muted-foreground">vs</span> {fixture.awayTeam.name}</CardTitle><CardDescription className="mt-1">{fixture.league.name} · Round {fixture.round} · Deadline: {formatDeadline(fixture.deadline)}</CardDescription></div><Badge variant={statusVariant(fixture.status)} className="w-fit rounded-full">{statusLabel(fixture.status)}</Badge></div></CardHeader><CardContent className="grid gap-4 p-5"><div className="grid gap-3 text-sm sm:grid-cols-2"><div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Home player</p><p className="mt-1 font-semibold">{fixture.homePlayer?.name ?? "Not assigned"}</p></div><div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Away player</p><p className="mt-1 font-semibold">{fixture.awayPlayer?.name ?? "Not assigned"}</p></div></div>{fixture.result && <div className="flex flex-col gap-2 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-wider text-primary">{fixture.result.status === "disputed" ? "Dispute under review" : "Submitted score"}</p><p className="mt-1 text-2xl font-black">{fixture.result.homeScore} – {fixture.result.awayScore}</p><p className="text-xs text-muted-foreground">Submitted by {fixture.result.submittedBy === fixture.homePlayer?.userId ? fixture.homePlayer?.name : fixture.awayPlayer?.name}</p></div>{fixture.result.proofUrl && <a href={fixture.result.proofUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"><FileImage className="size-4" /> View proof</a>}</div>}{fixture.canConfirm && <div className="flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4"><div><p className="font-bold">Match result to confirm</p><p className="mt-1 text-sm text-muted-foreground">Your opponent submitted this score. Confirm it or dispute it for admin review.</p></div><div className="flex flex-wrap gap-2"><Button disabled={confirm.isPending} onClick={() => confirm.mutate({ fixtureId: fixture.id })} className="rounded-xl"><Check className="size-4" /> Confirm result</Button><Button disabled={dispute.isPending} variant="outline" onClick={() => dispute.mutate({ fixtureId: fixture.id })} className="rounded-xl"><ShieldAlert className="size-4" /> Dispute result</Button></div></div>}{fixture.canSubmit && (selectedId === fixture.id ? <div className="grid gap-4 rounded-xl border border-border/80 bg-muted/40 p-4"><div className="grid grid-cols-2 gap-3"><div><Label>Home score</Label><Input type="number" min={0} max={99} value={scores.home} onChange={(event) => setScores({ ...scores, home: event.target.value })} /></div><div><Label>Away score</Label><Input type="number" min={0} max={99} value={scores.away} onChange={(event) => setScores({ ...scores, away: event.target.value })} /></div></div><label className="grid gap-2"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Optional screenshot/proof</span><span className="flex items-center gap-2 rounded-xl border border-dashed border-border bg-background px-3 py-3 text-sm"><Upload className="size-4 text-primary" /><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => handleProof(event.target.files?.[0])} /></span>{scores.proofData && <span className="text-xs font-semibold text-primary">Proof attached and ready to upload.</span>}</label><div className="flex gap-2"><Button disabled={submit.isPending} onClick={() => submitResult(fixture.id)} className="rounded-xl">{submit.isPending ? "Submitting…" : "Submit result"}</Button><Button type="button" variant="outline" onClick={() => { setSelectedId(null); setScores({ home: "", away: "", proofData: "" }); }} className="rounded-xl"><X className="size-4" /> Cancel</Button></div></div> : <Button variant="outline" onClick={() => setSelectedId(fixture.id)} className="w-fit rounded-xl"><Clock3 className="size-4" /> Submit match result</Button>)}</CardContent></Card>)}</div>}
+  </div>;
+}

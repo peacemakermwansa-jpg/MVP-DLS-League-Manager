@@ -11,12 +11,14 @@ import {
   addPlayerByPlayerId, applyToLeague, findLeague, findPlayerByPlayerId, listLeaguePlayers, playerDashboard, playerProfile, removePlayer,
   assignPlayerTeam, reviewPlayer, teamPage, updateOwnProfile,
 } from "./players";
+import { confirmPlayerResult, disputePlayerResult, ownerMatchManagement, playerFixtures, resolveAdminResult, submitPlayerResult } from "./matches";
 
 const leagueIdInput = z.object({ leagueId: z.number().int().positive() });
 const playerIdInput = z.object({ playerId: z.number().int().min(100000).max(999999) });
 const teamDetails = z.object({ name: z.string().trim().min(2).max(120), managerName: z.string().trim().min(2).max(120), logoUrl: z.string().trim().url().max(500).optional().or(z.literal("")) });
 const leagueDetails = z.object({ name: z.string().trim().min(2).max(120), seasonName: z.string().trim().min(2).max(120), numberOfTeams: z.number().int().min(2).max(32) });
 const playerDetails = z.object({ playerName: z.string().trim().min(2).max(120), username: z.string().trim().min(2).max(64).regex(/^[a-zA-Z0-9_.-]+$/), profilePicture: z.string().trim().url().max(500).optional().or(z.literal("")), whatsappNumber: z.string().trim().max(32).optional().or(z.literal("")) });
+const scoreDetails = z.object({ fixtureId: z.number().int().positive(), homeScore: z.number().int().min(0).max(99), awayScore: z.number().int().min(0).max(99) });
 
 export const appRouter = router({
   system: systemRouter,
@@ -43,6 +45,14 @@ export const appRouter = router({
     register: protectedProcedure.input(leagueIdInput.merge(playerDetails)).mutation(({ ctx, input }) => applyToLeague({ ...input, userId: ctx.user.id })),
     updateProfile: protectedProcedure.input(playerDetails.extend({ membershipId: z.number().int().positive() })).mutation(({ ctx, input }) => updateOwnProfile({ ...input, userId: ctx.user.id })),
     team: protectedProcedure.input(z.object({ teamId: z.number().int().positive() })).query(({ ctx, input }) => teamPage(input.teamId, ctx.user.id)),
+    fixtures: protectedProcedure.query(({ ctx }) => playerFixtures(ctx.user.id)),
+    submitResult: protectedProcedure.input(scoreDetails.extend({ proofData: z.string().max(7_000_000).optional() })).mutation(({ ctx, input }) => submitPlayerResult({ ...input, userId: ctx.user.id })),
+    confirmResult: protectedProcedure.input(z.object({ fixtureId: z.number().int().positive() })).mutation(({ ctx, input }) => confirmPlayerResult(input.fixtureId, ctx.user.id)),
+    disputeResult: protectedProcedure.input(z.object({ fixtureId: z.number().int().positive() })).mutation(({ ctx, input }) => disputePlayerResult(input.fixtureId, ctx.user.id)),
+  }),
+  matchAdmin: router({
+    list: protectedProcedure.input(leagueIdInput).query(({ ctx, input }) => ownerMatchManagement(input.leagueId, ctx.user.id)),
+    resolve: protectedProcedure.input(z.object({ fixtureId: z.number().int().positive(), action: z.enum(["approve", "correct", "cancel"]), homeScore: z.number().int().min(0).max(99).optional(), awayScore: z.number().int().min(0).max(99).optional() })).mutation(({ ctx, input }) => resolveAdminResult({ ...input, userId: ctx.user.id })),
   }),
   playerAdmin: router({
     list: protectedProcedure.input(leagueIdInput).query(({ ctx, input }) => listLeaguePlayers(input.leagueId, ctx.user.id)),

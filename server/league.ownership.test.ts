@@ -51,8 +51,8 @@ describeWithDatabase("league ownership flow", () => {
     const { fixtureCount } = await callerA.league.generateFixtures({ leagueId });
     expect(fixtureCount).toBe(2);
     const dashboardBeforeResult = await callerA.league.dashboard({ leagueId });
-    const pendingFixture = dashboardBeforeResult.fixtures.find((fixture) => fixture.status === "pending");
-    if (!pendingFixture) throw new Error("Expected a pending fixture.");
+    const pendingFixture = dashboardBeforeResult.fixtures.find((fixture) => fixture.status === "scheduled");
+    if (!pendingFixture) throw new Error("Expected a scheduled fixture.");
     await callerA.league.recordResult({ fixtureId: pendingFixture.id, homeScore: 3, awayScore: 1 });
     await expect(callerA.league.recordResult({ fixtureId: pendingFixture.id, homeScore: 0, awayScore: 9 })).rejects.toMatchObject({ code: "CONFLICT" });
     const dashboardAfterResult = await callerA.league.dashboard({ leagueId });

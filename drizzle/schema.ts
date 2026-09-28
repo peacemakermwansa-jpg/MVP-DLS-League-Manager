@@ -57,7 +57,7 @@ export const fixtures = mysqlTable("fixtures", {
   round: int("round").notNull(),
   homeTeamId: int("homeTeamId").notNull().references(() => teams.id, { onDelete: "cascade" }),
   awayTeamId: int("awayTeamId").notNull().references(() => teams.id, { onDelete: "cascade" }),
-  status: mysqlEnum("status", ["pending", "completed"]).default("pending").notNull(),
+  status: mysqlEnum("status", ["scheduled", "result_submitted", "confirmed", "disputed"]).default("scheduled").notNull(),
   homeScore: int("homeScore"),
   awayScore: int("awayScore"),
   deadline: timestamp("deadline"),
@@ -67,6 +67,26 @@ export const fixtures = mysqlTable("fixtures", {
 }, (table) => ({ fixtureUnique: uniqueIndex("fixtures_round_pairing_unique").on(table.leagueId, table.round, table.homeTeamId, table.awayTeamId) }));
 export type Fixture = typeof fixtures.$inferSelect;
 export type InsertFixture = typeof fixtures.$inferInsert;
+
+/** One active player/admin result workflow per fixture. Cancelled rows may be reused. */
+export const fixtureResults = mysqlTable("fixtureResults", {
+  id: int("id").autoincrement().primaryKey(),
+  fixtureId: int("fixtureId").notNull().unique().references(() => fixtures.id, { onDelete: "cascade" }),
+  submittedBy: int("submittedBy").notNull().references(() => users.id, { onDelete: "cascade" }),
+  homeScore: int("homeScore").notNull(),
+  awayScore: int("awayScore").notNull(),
+  proofKey: text("proofKey"),
+  proofUrl: text("proofUrl"),
+  status: mysqlEnum("status", ["submitted", "confirmed", "disputed", "cancelled"]).default("submitted").notNull(),
+  confirmedBy: int("confirmedBy").references(() => users.id, { onDelete: "set null" }),
+  disputedAt: timestamp("disputedAt"),
+  resolvedAt: timestamp("resolvedAt"),
+  resolvedBy: int("resolvedBy").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type FixtureResult = typeof fixtureResults.$inferSelect;
+export type InsertFixtureResult = typeof fixtureResults.$inferInsert;
 
 /** A user's participation in one league. The same account may have one profile per league. */
 export const leaguePlayers = mysqlTable("leaguePlayers", {

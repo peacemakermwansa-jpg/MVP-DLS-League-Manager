@@ -24,6 +24,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import {
   CalendarDays,
   ClipboardCheck,
+  Flag,
   LayoutDashboard,
   LogIn,
   LogOut,
@@ -45,7 +46,9 @@ const menuItems = [
   { icon: ClipboardCheck, label: "Results", path: "/results" },
   { icon: ShieldCheck, label: "League table", path: "/table" },
   { icon: UserRound, label: "My player centre", path: "/player" },
+  { icon: Flag, label: "My matches", path: "/matches" },
   { icon: Users, label: "Player register", path: "/players" },
+  { icon: ClipboardCheck, label: "Match management", path: "/match-management" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "mvp-sidebar-width";

@@ -24,7 +24,7 @@ function fixture(overrides: Partial<FixtureRow>): FixtureRow {
     round: 1,
     homeTeamId: 1,
     awayTeamId: 2,
-    status: "pending",
+    status: "scheduled",
     homeScore: null,
     awayScore: null,
     playedAt: null,
@@ -60,10 +60,10 @@ describe("calculateStandings", () => {
     const rows = calculateStandings(
       [team(1, "Alpha"), team(2, "Bravo"), team(3, "Charlie")],
       [
-        fixture({ id: 1, homeTeamId: 1, awayTeamId: 2, status: "completed", homeScore: 2, awayScore: 0 }),
-        fixture({ id: 2, homeTeamId: 2, awayTeamId: 3, status: "completed", homeScore: 1, awayScore: 1 }),
-        fixture({ id: 3, homeTeamId: 3, awayTeamId: 1, status: "completed", homeScore: 4, awayScore: 2 }),
-        fixture({ id: 4, homeTeamId: 1, awayTeamId: 3, status: "pending", homeScore: null, awayScore: null }),
+        fixture({ id: 1, homeTeamId: 1, awayTeamId: 2, status: "confirmed", homeScore: 2, awayScore: 0 }),
+        fixture({ id: 2, homeTeamId: 2, awayTeamId: 3, status: "confirmed", homeScore: 1, awayScore: 1 }),
+        fixture({ id: 3, homeTeamId: 3, awayTeamId: 1, status: "confirmed", homeScore: 4, awayScore: 2 }),
+        fixture({ id: 4, homeTeamId: 1, awayTeamId: 3, status: "scheduled", homeScore: null, awayScore: null }),
       ]
     );
 

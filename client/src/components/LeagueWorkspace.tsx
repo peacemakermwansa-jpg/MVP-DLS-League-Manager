@@ -106,7 +106,7 @@ function EmptyState({ icon: Icon, title, description, action }: { icon: typeof T
 }
 
 function FixtureRow({ fixture, onRecordResult }: { fixture: Fixture; onRecordResult?: () => void }) {
-  const completed = fixture.status === "completed";
+  const completed = fixture.status === "confirmed";
   return (
     <div className="group flex flex-col gap-4 rounded-2xl border border-border/80 bg-background/70 p-4 transition-colors hover:border-primary/40 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.13em] text-muted-foreground">
@@ -183,8 +183,8 @@ export default function LeagueWorkspace() {
   }, [activeLeagueId, leagueSummaries]);
 
   useEffect(() => {
-    if (!resultForm.fixtureId && dashboard?.fixtures.find((fixture) => fixture.status === "pending")) {
-      const next = dashboard.fixtures.find((fixture) => fixture.status === "pending");
+    if (!resultForm.fixtureId && dashboard?.fixtures.find((fixture) => fixture.status === "scheduled")) {
+      const next = dashboard.fixtures.find((fixture) => fixture.status === "scheduled");
       if (next) setResultForm((current) => ({ ...current, fixtureId: String(next.id) }));
     }
   }, [dashboard, resultForm.fixtureId]);
@@ -268,8 +268,8 @@ export default function LeagueWorkspace() {
   const fixtures = dashboard?.fixtures ?? [];
   const teams = dashboard?.teams ?? [];
   const standings = dashboard?.standings ?? [];
-  const upcomingFixtures = fixtures.filter((fixture) => fixture.status === "pending");
-  const completedFixtures = fixtures.filter((fixture) => fixture.status === "completed");
+  const upcomingFixtures = fixtures.filter((fixture) => fixture.status === "scheduled");
+  const completedFixtures = fixtures.filter((fixture) => fixture.status === "confirmed");
   const selectedFixture = fixtures.find((fixture) => fixture.id === Number(resultForm.fixtureId));
   const stats = useMemo(() => ({
     fixtureTotal: fixtures.length,

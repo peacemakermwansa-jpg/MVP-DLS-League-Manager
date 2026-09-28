@@ -64,7 +64,7 @@ export function calculateStandings(teamRows: Team[], fixtureRows: Fixture[]): St
   }
 
   for (const fixture of fixtureRows) {
-    if (fixture.status !== "completed" || fixture.homeScore == null || fixture.awayScore == null) continue;
+    if (fixture.status !== "confirmed" || fixture.homeScore == null || fixture.awayScore == null) continue;
     const home = table.get(fixture.homeTeamId);
     const away = table.get(fixture.awayTeamId);
     if (!home || !away) continue;
@@ -109,7 +109,7 @@ export async function listLeagues(userId: number) {
     ...league,
     teamCount: teamRows.filter((team) => team.leagueId === league.id).length,
     fixtureCount: fixtureRows.filter((fixture) => fixture.leagueId === league.id).length,
-    completedFixtureCount: fixtureRows.filter((fixture) => fixture.leagueId === league.id && fixture.status === "completed").length,
+    completedFixtureCount: fixtureRows.filter((fixture) => fixture.leagueId === league.id && fixture.status === "confirmed").length,
   }));
 }
 
@@ -208,8 +208,8 @@ export async function recordResult(input: { fixtureId: number; homeScore: number
   const fixture = fixtureRows[0];
   if (!fixture) throw new TRPCError({ code: "NOT_FOUND", message: "Fixture not found." });
   await requireOwnedLeague(db, fixture.leagueId, input.userId);
-  if (fixture.status === "completed") throw new TRPCError({ code: "CONFLICT", message: "This fixture already has a recorded result." });
-  const updateResult = await db.update(fixtures).set({ homeScore: input.homeScore, awayScore: input.awayScore, status: "completed", playedAt: new Date() }).where(and(eq(fixtures.id, input.fixtureId), eq(fixtures.status, "pending")));
+  if (fixture.status !== "scheduled") throw new TRPCError({ code: "CONFLICT", message: "This fixture already has a recorded result or submission." });
+  const updateResult = await db.update(fixtures).set({ homeScore: input.homeScore, awayScore: input.awayScore, status: "confirmed", playedAt: new Date() }).where(and(eq(fixtures.id, input.fixtureId), eq(fixtures.status, "scheduled")));
   if (updateResult[0].affectedRows !== 1) throw new TRPCError({ code: "CONFLICT", message: "This fixture already has a recorded result." });
   return { success: true } as const;
 }

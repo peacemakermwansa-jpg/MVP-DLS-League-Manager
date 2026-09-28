@@ -6,6 +6,8 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import DashboardLayout from "./components/DashboardLayout";
 import PlayerDashboard from "./components/PlayerDashboard";
 import PlayerManagement from "./components/PlayerManagement";
+import PlayerMatchCenter from "./components/PlayerMatchCenter";
+import MatchManagement from "./components/MatchManagement";
 import TeamPage from "./components/TeamPage";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -19,6 +21,8 @@ function Router() {
     <Switch>
       <Route path="/player"><WorkspaceRoute><PlayerDashboard /></WorkspaceRoute></Route>
       <Route path="/players"><WorkspaceRoute><PlayerManagement /></WorkspaceRoute></Route>
+      <Route path="/matches"><WorkspaceRoute><PlayerMatchCenter /></WorkspaceRoute></Route>
+      <Route path="/match-management"><WorkspaceRoute><MatchManagement /></WorkspaceRoute></Route>
       <Route path="/team/:teamId"><WorkspaceRoute><TeamPage /></WorkspaceRoute></Route>
       <Route path="/"><WorkspaceRoute><Home /></WorkspaceRoute></Route>
       <Route path="/leagues"><WorkspaceRoute><Home /></WorkspaceRoute></Route>
