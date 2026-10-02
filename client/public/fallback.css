@@ -1,0 +1,51 @@
+/* Critical fallback: intentionally low specificity so Tailwind wins when loaded. */
+:where(html) { background: #f7f5ed; }
+:where(body) { margin: 0; min-width: 320px; background: #f7f5ed; color: #24223a; font-family: Arial, Helvetica, sans-serif; line-height: 1.5; }
+:where(*, *::before, *::after) { box-sizing: border-box; }
+:where(#root) { min-height: 100vh; }
+:where(h1, h2, h3, h4, h5, h6, p) { margin: 0; }
+:where(button, input, select, textarea) { font: inherit; }
+:where(button) { cursor: pointer; }
+:where(a) { color: inherit; text-decoration: none; }
+:where(.min-h-screen) { min-height: 100vh; }
+:where(.w-full) { width: 100%; }
+:where(.max-w-md) { max-width: 28rem; }
+:where(.max-w-\[1280px\]) { max-width: 80rem; }
+:where(.mx-auto) { margin-inline: auto; }
+:where(.flex) { display: flex; }
+:where(.grid) { display: grid; }
+:where(.hidden) { display: none; }
+:where(.items-center) { align-items: center; }
+:where(.items-end) { align-items: flex-end; }
+:where(.justify-center) { justify-content: center; }
+:where(.justify-between) { justify-content: space-between; }
+:where(.place-items-center) { place-items: center; }
+:where(.gap-2) { gap: .5rem; }
+:where(.gap-3) { gap: .75rem; }
+:where(.gap-4) { gap: 1rem; }
+:where(.gap-5) { gap: 1.25rem; }
+:where(.p-4) { padding: 1rem; }
+:where(.p-6) { padding: 1.5rem; }
+:where(.p-7) { padding: 1.75rem; }
+:where(.px-4) { padding-inline: 1rem; }
+:where(.py-6) { padding-block: 1.5rem; }
+:where(.rounded-xl) { border-radius: .75rem; }
+:where(.rounded-\[28px\]) { border-radius: 1.75rem; }
+:where(.border) { border: 1px solid #dedbcf; }
+:where(.bg-background) { background: #f7f5ed; }
+:where(.bg-card) { background: #fffefa; }
+:where(.text-center) { text-align: center; }
+:where(.text-muted-foreground) { color: #6d6a70; }
+:where(.text-primary) { color: #829d00; }
+:where(.bg-primary) { background: #b4cf00; }
+:where(.text-primary-foreground) { color: #24223a; }
+:where(.font-bold) { font-weight: 700; }
+:where(.font-semibold) { font-weight: 600; }
+:where(.text-sm) { font-size: .875rem; }
+:where(.text-3xl) { font-size: 1.875rem; line-height: 1.2; }
+:where(.leading-6) { line-height: 1.5rem; }
+@media (min-width: 640px) {
+  :where(.sm\:p-9) { padding: 2.25rem; }
+  :where(.sm\:px-8) { padding-inline: 2rem; }
+  :where(.sm\:py-10) { padding-block: 2.5rem; }
+}
