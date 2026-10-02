@@ -20,7 +20,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
-import { useIsMobile } from "@/hooks/useMobile";
 import {
   CalendarDays,
   ClipboardCheck,
@@ -93,7 +92,6 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
-  const isMobile = useIsMobile();
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const activeMenuItem = menuItems.find((item) => item.path === location);
@@ -206,15 +204,13 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
       </div>
 
       <SidebarInset>
-        {isMobile && (
-          <div className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border/70 bg-background/90 px-4 backdrop-blur-xl">
-            <SidebarTrigger className="size-9 rounded-xl bg-card" />
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.17em] text-primary">MVP</p>
-              <p className="text-sm font-semibold">{activeMenuItem?.label ?? "Workspace"}</p>
-            </div>
+        <div className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border/70 bg-background/90 px-4 backdrop-blur-xl md:hidden">
+          <SidebarTrigger />
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.17em] text-primary">MVP</p>
+            <p className="text-sm font-semibold">{activeMenuItem?.label ?? "Workspace"}</p>
           </div>
-        )}
+        </div>
         <main className="min-h-screen flex-1">{children}</main>
       </SidebarInset>
     </>
