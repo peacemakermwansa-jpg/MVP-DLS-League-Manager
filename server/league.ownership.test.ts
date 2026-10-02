@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { leagues, users, type User } from "../drizzle/schema";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
+import { allocateTestPlayerIds } from "./test-player-ids";
 import type { TrpcContext } from "./_core/context";
 
 const describeWithDatabase = process.env.DATABASE_URL ? describe : describe.skip;
@@ -32,11 +33,11 @@ describeWithDatabase("league ownership flow", () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const accountAOpenId = `ownership-a-${suffix}`;
     const accountBOpenId = `ownership-b-${suffix}`;
-    const basePlayerId = 100000 + (Date.now() % 700000);
+    const [accountAPlayerId, accountBPlayerId] = await allocateTestPlayerIds(db, 2);
     createdOpenIds.push(accountAOpenId, accountBOpenId);
     await db.insert(users).values([
-      { openId: accountAOpenId, playerId: basePlayerId, name: "Account A", email: `${accountAOpenId}@example.test`, loginMethod: "test" },
-      { openId: accountBOpenId, playerId: basePlayerId + 1, name: "Account B", email: `${accountBOpenId}@example.test`, loginMethod: "test" },
+      { openId: accountAOpenId, playerId: accountAPlayerId, name: "Account A", email: `${accountAOpenId}@example.test`, loginMethod: "test" },
+      { openId: accountBOpenId, playerId: accountBPlayerId, name: "Account B", email: `${accountBOpenId}@example.test`, loginMethod: "test" },
     ]);
     const accountRows = await db.select().from(users).where(orUserIds(accountAOpenId, accountBOpenId));
     const accountA = accountRows.find((user) => user.openId === accountAOpenId);

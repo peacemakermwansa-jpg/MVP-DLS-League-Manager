@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { users } from "../drizzle/schema";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
+import { allocateTestPlayerIds } from "./test-player-ids";
 import type { TrpcContext } from "./_core/context";
 
 const describeWithDatabase = process.env.DATABASE_URL ? describe : describe.skip;
@@ -24,13 +25,13 @@ describeWithDatabase("player-submitted fixture results", () => {
     const homeOpenId = `match-home-${suffix}`;
     const awayOpenId = `match-away-${suffix}`;
     const outsiderOpenId = `match-outsider-${suffix}`;
-    const basePlayerId = 200000 + (Date.now() % 600000);
+    const [adminPlayerId, homePlayerId, awayPlayerId, outsiderPlayerId] = await allocateTestPlayerIds(db, 4);
     createdOpenIds.push(adminOpenId, homeOpenId, awayOpenId, outsiderOpenId);
     await db.insert(users).values([
-      { openId: adminOpenId, playerId: basePlayerId, name: "Match Admin", email: `${adminOpenId}@example.test`, loginMethod: "test" },
-      { openId: homeOpenId, playerId: basePlayerId + 1, name: "Arsenal Player", email: `${homeOpenId}@example.test`, loginMethod: "test" },
-      { openId: awayOpenId, playerId: basePlayerId + 2, name: "Barcelona Player", email: `${awayOpenId}@example.test`, loginMethod: "test" },
-      { openId: outsiderOpenId, playerId: basePlayerId + 3, name: "Unrelated Player", email: `${outsiderOpenId}@example.test`, loginMethod: "test" },
+      { openId: adminOpenId, playerId: adminPlayerId, name: "Match Admin", email: `${adminOpenId}@example.test`, loginMethod: "test" },
+      { openId: homeOpenId, playerId: homePlayerId, name: "Arsenal Player", email: `${homeOpenId}@example.test`, loginMethod: "test" },
+      { openId: awayOpenId, playerId: awayPlayerId, name: "Barcelona Player", email: `${awayOpenId}@example.test`, loginMethod: "test" },
+      { openId: outsiderOpenId, playerId: outsiderPlayerId, name: "Unrelated Player", email: `${outsiderOpenId}@example.test`, loginMethod: "test" },
     ]);
     const rows = await db.select().from(users).where(or(eq(users.openId, adminOpenId), eq(users.openId, homeOpenId), eq(users.openId, awayOpenId), eq(users.openId, outsiderOpenId)));
     const admin = rows.find((row) => row.openId === adminOpenId);

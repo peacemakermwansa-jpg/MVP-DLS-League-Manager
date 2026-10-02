@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { users } from "../drizzle/schema";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
+import { allocateTestPlayerIds } from "./test-player-ids";
 import type { TrpcContext } from "./_core/context";
 
 const describeWithDatabase = process.env.DATABASE_URL ? describe : describe.skip;
@@ -23,12 +24,12 @@ describeWithDatabase("player registration and permissions", () => {
     const adminOpenId = `player-admin-${suffix}`;
     const playerOpenId = `player-user-${suffix}`;
     const joinerOpenId = `player-joiner-${suffix}`;
-    const basePlayerId = 100000 + (Date.now() % 700000);
+    const [adminPlayerId, playerPlayerId, joinerPlayerId] = await allocateTestPlayerIds(db, 3);
     createdOpenIds.push(adminOpenId, playerOpenId, joinerOpenId);
     await db.insert(users).values([
-      { openId: adminOpenId, playerId: basePlayerId, name: "Player Admin", email: `${adminOpenId}@example.test`, loginMethod: "test" },
-      { openId: playerOpenId, playerId: basePlayerId + 1, name: "Player User", email: `${playerOpenId}@example.test`, loginMethod: "test" },
-      { openId: joinerOpenId, playerId: basePlayerId + 2, name: "League Joiner", email: `${joinerOpenId}@example.test`, loginMethod: "test" },
+      { openId: adminOpenId, playerId: adminPlayerId, name: "Player Admin", email: `${adminOpenId}@example.test`, loginMethod: "test" },
+      { openId: playerOpenId, playerId: playerPlayerId, name: "Player User", email: `${playerOpenId}@example.test`, loginMethod: "test" },
+      { openId: joinerOpenId, playerId: joinerPlayerId, name: "League Joiner", email: `${joinerOpenId}@example.test`, loginMethod: "test" },
     ]);
     const rows = await db.select().from(users).where(or(eq(users.openId, adminOpenId), eq(users.openId, playerOpenId), eq(users.openId, joinerOpenId)));
     const admin = rows.find((row) => row.openId === adminOpenId);

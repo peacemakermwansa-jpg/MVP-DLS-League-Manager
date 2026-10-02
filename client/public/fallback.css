@@ -14,7 +14,6 @@
 :where(.mx-auto) { margin-inline: auto; }
 :where(.flex) { display: flex; }
 :where(.grid) { display: grid; }
-:where(.hidden) { display: none; }
 :where(.items-center) { align-items: center; }
 :where(.items-end) { align-items: flex-end; }
 :where(.justify-center) { justify-content: center; }
