@@ -21,7 +21,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import { cn } from "@/lib/utils";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, VariantProps } from "class-variance-authority";
-import { PanelLeftIcon } from "lucide-react";
+import { MenuIcon } from "lucide-react";
 import * as React from "react";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
@@ -271,16 +271,18 @@ function SidebarTrigger({
     <Button
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
+      aria-label="Open navigation menu"
+      title="Open navigation menu"
       variant="ghost"
       size="icon"
-      className={cn("size-7", className)}
+      className={cn("size-9 rounded-xl border border-border bg-card shadow-sm", className)}
       onClick={event => {
         onClick?.(event);
         toggleSidebar();
       }}
       {...props}
     >
-      <PanelLeftIcon />
+      <MenuIcon className="size-5" />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );
@@ -731,4 +733,3 @@ export {
   SidebarTrigger,
   useSidebar
 };
-
