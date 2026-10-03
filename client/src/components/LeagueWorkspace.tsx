@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +57,13 @@ function initials(value: string) {
 function formatDate(value: Date | null) {
   if (!value) return "Not played";
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+}
+
+function getTimeGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -154,6 +162,7 @@ function StatCard({ label, value, detail, icon: Icon, accent = false }: { label:
 }
 
 export default function LeagueWorkspace() {
+  const { user } = useAuth();
   const [location, setLocation] = useLocation();
   const view = location === "/" ? "overview" : location.slice(1);
   const [activeLeagueId, setActiveLeagueId] = useState<number | null>(null);
@@ -163,6 +172,7 @@ export default function LeagueWorkspace() {
   const [editingTeamId, setEditingTeamId] = useState<number | null>(null);
   const [resultForm, setResultForm] = useState({ fixtureId: "", homeScore: "", awayScore: "" });
   const [copiedLeagueId, setCopiedLeagueId] = useState<number | null>(null);
+  const [copiedPlayerId, setCopiedPlayerId] = useState(false);
 
   const overviewQuery = trpc.league.overview.useQuery(undefined, { refetchOnWindowFocus: false });
   const leagueSummaries = overviewQuery.data ?? [];
@@ -174,6 +184,18 @@ export default function LeagueWorkspace() {
   );
   const dashboard = dashboardQuery.data;
   const utils = trpc.useUtils();
+
+  const copyPlayerId = async () => {
+    if (!user?.playerId) return;
+    try {
+      await navigator.clipboard.writeText(String(user.playerId));
+      setCopiedPlayerId(true);
+      toast.success("Player ID copied.");
+      window.setTimeout(() => setCopiedPlayerId(false), 1800);
+    } catch {
+      toast.error("Could not copy the Player ID. Please copy it manually.");
+    }
+  };
 
   useEffect(() => {
     if (activeLeagueId === null && leagueSummaries[0]) setActiveLeagueId(leagueSummaries[0].id);
@@ -502,8 +524,9 @@ export default function LeagueWorkspace() {
     <div className="mvp-grid min-h-screen bg-background">
       <div className="container py-7 sm:py-10">
         <header className="flex flex-col gap-6 border-b border-border/70 pb-7 sm:flex-row sm:items-start sm:justify-between">
-          <div><div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-primary"><span className="grid size-6 place-items-center rounded-lg bg-primary text-[9px] font-black text-primary-foreground">M</span> MVP / DLS operations</div><p className="mt-4 text-sm font-semibold text-muted-foreground">Good morning, admin.</p></div>
-          <div className="flex items-center gap-3"><div className="hidden rounded-full border border-border/80 bg-card px-3 py-2 text-xs font-semibold text-muted-foreground sm:flex sm:items-center sm:gap-2"><CircleHelp className="size-3.5 text-primary" /> Foundation mode · Auth ready</div><Button onClick={() => setLocation("/leagues")} variant="outline" size="icon" className="size-10 rounded-xl" aria-label="Create league"><Plus className="size-4" /></Button></div>
+          <div><div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-primary"><span className="grid size-6 place-items-center rounded-lg bg-primary text-[9px] font-black text-primary-foreground">M</span> MVP / DLS operations</div><p className="mt-4 text-sm font-semibold text-muted-foreground">{getTimeGreeting()}, {user?.name || "there"}.</p></div>
+          <div className="flex flex-wrap items-center gap-3 sm:justify-end"><div className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-3 py-2"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Your Player ID</p><p className="number-display text-lg font-bold">{user?.playerId ?? "—"}</p></div><Button type="button" variant="outline" size="sm" className="rounded-xl bg-background" disabled={!user?.playerId} onClick={copyPlayerId}>{copiedPlayerId ? <Check className="size-4" /> : <Copy className="size-4" />}<span className="hidden sm:inline">{copiedPlayerId ? "Copied" : "Copy ID"}</span></Button></div>
+          <div className="flex items-center gap-3"><div className="hidden rounded-full border border-border/80 bg-card px-3 py-2 text-xs font-semibold text-muted-foreground sm:flex sm:items-center sm:gap-2"><CircleHelp className="size-3.5 text-primary" /> Foundation mode · Auth ready</div><Button onClick={() => setLocation("/leagues")} variant="outline" size="icon" className="size-10 rounded-xl" aria-label="Create league"><Plus className="size-4" /></Button></div></div>
         </header>
         <main className="mvp-enter pt-8">{view === "overview" ? renderOverview() : view === "leagues" ? renderLeagues() : view === "teams" ? renderTeams() : view === "fixtures" ? renderFixtures() : view === "results" ? renderResults() : view === "table" ? renderTable() : renderOverview()}</main>
       </div>
