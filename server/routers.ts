@@ -13,6 +13,7 @@ import {
 } from "./players";
 import { confirmPlayerResult, disputePlayerResult, ownerMatchManagement, playerFixtures, resolveAdminResult, submitPlayerResult } from "./matches";
 import { chooseAccountType } from "./db";
+import { listNotifications, markAllNotificationsRead, markNotificationRead } from "./notifications";
 
 const leagueIdInput = z.object({ leagueId: z.number().int().positive() });
 const playerIdInput = z.object({ playerId: z.number().int().min(100000).max(999999) });
@@ -63,6 +64,11 @@ export const appRouter = router({
     assignTeam: protectedProcedure.input(z.object({ membershipId: z.number().int().positive(), teamId: z.number().int().positive().nullable() })).mutation(({ ctx, input }) => assignPlayerTeam({ ...input, userId: ctx.user.id })),
     review: protectedProcedure.input(z.object({ membershipId: z.number().int().positive(), registrationStatus: z.enum(["approved", "rejected"]), teamId: z.number().int().positive().nullable().optional() })).mutation(({ ctx, input }) => reviewPlayer({ ...input, userId: ctx.user.id })),
     remove: protectedProcedure.input(z.object({ membershipId: z.number().int().positive() })).mutation(({ ctx, input }) => removePlayer(input.membershipId, ctx.user.id)),
+  }),
+  notifications: router({
+    list: protectedProcedure.query(({ ctx }) => listNotifications(ctx.user.id)),
+    markRead: protectedProcedure.input(z.object({ notificationId: z.number().int().positive() })).mutation(({ ctx, input }) => markNotificationRead({ notificationId: input.notificationId, userId: ctx.user.id })),
+    markAllRead: protectedProcedure.mutation(({ ctx }) => markAllNotificationsRead(ctx.user.id)),
   }),
 });
 export type AppRouter = typeof appRouter;

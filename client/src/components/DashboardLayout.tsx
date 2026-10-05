@@ -38,6 +38,7 @@ import {
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
+import NotificationCenter from "./NotificationCenter";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Overview", path: "/" },
@@ -220,12 +221,16 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
       </div>
 
       <SidebarInset>
+        <div className="fixed right-5 top-4 z-50 hidden md:block">
+          <NotificationCenter />
+        </div>
         <div className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border/70 bg-background/90 px-4 backdrop-blur-xl md:hidden">
           <SidebarTrigger />
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.17em] text-primary">MVP</p>
             <p className="text-sm font-semibold">{activeMenuItem?.label ?? "Workspace"}</p>
           </div>
+          <div className="ml-auto"><NotificationCenter /></div>
         </div>
         <main className="min-h-screen flex-1">{children}</main>
       </SidebarInset>

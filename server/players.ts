@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { fixtures, leaguePlayers, leagues, teams, users } from "../drizzle/schema";
 import { calculateStandings } from "./league";
 import { getDb } from "./db";
+import { createNotification } from "./notifications";
 
 async function requireDb() {
   const db = await getDb();
@@ -47,10 +48,11 @@ export async function playerProfile(userId: number) {
 
 export async function applyToLeague(input: { leagueId: number; playerName: string; username: string; profilePicture?: string; whatsappNumber?: string; userId: number }) {
   const db = await requireDb();
-  const leagueRows = await db.select({ id: leagues.id }).from(leagues).where(eq(leagues.id, input.leagueId)).limit(1);
+  const leagueRows = await db.select({ id: leagues.id, name: leagues.name, createdBy: leagues.createdBy }).from(leagues).where(eq(leagues.id, input.leagueId)).limit(1);
   if (!leagueRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "League not found." });
   if (await getMembership(db, input.leagueId, input.userId)) throw new TRPCError({ code: "CONFLICT", message: "You already have a registration in this league." });
   const result = await db.insert(leaguePlayers).values({ leagueId: input.leagueId, userId: input.userId, playerName: input.playerName, username: input.username, profilePicture: input.profilePicture || null, whatsappNumber: input.whatsappNumber || null, registrationStatus: "pending" });
+  await createNotification(db, { userId: leagueRows[0].createdBy, type: "join_request", title: "New join request", message: `${input.playerName} requested to join ${leagueRows[0].name}.`, href: "/players" });
   return { id: Number(result[0].insertId) };
 }
 
@@ -111,15 +113,18 @@ export async function addPlayerByPlayerId(input: { leagueId: number; playerId: n
 
 export async function reviewPlayer(input: { membershipId: number; registrationStatus: "approved" | "rejected"; teamId?: number | null; userId: number }) {
   const db = await requireDb();
-  const rows = await db.select().from(leaguePlayers).where(eq(leaguePlayers.id, input.membershipId)).limit(1);
-  const membership = rows[0];
-  if (!membership) throw new TRPCError({ code: "NOT_FOUND", message: "Player registration not found." });
+  const rows = await db.select({ membership: leaguePlayers, league: leagues }).from(leaguePlayers).innerJoin(leagues, eq(leagues.id, leaguePlayers.leagueId)).where(eq(leaguePlayers.id, input.membershipId)).limit(1);
+  const row = rows[0];
+  const membership = row?.membership;
+  if (!row || !membership) throw new TRPCError({ code: "NOT_FOUND", message: "Player registration not found." });
   await requireOwnedLeague(db, membership.leagueId, input.userId);
   if (input.teamId != null) {
     const teamRows = await db.select({ id: teams.id }).from(teams).where(and(eq(teams.id, input.teamId), eq(teams.leagueId, membership.leagueId))).limit(1);
     if (!teamRows[0]) throw new TRPCError({ code: "BAD_REQUEST", message: "That team does not belong to this league." });
   }
   await db.update(leaguePlayers).set({ registrationStatus: input.registrationStatus, teamId: input.registrationStatus === "approved" ? (input.teamId ?? membership.teamId) : null }).where(eq(leaguePlayers.id, input.membershipId));
+  const approved = input.registrationStatus === "approved";
+  await createNotification(db, { userId: membership.userId, type: "approval", title: approved ? "Registration approved" : "Registration declined", message: approved ? `Your registration in ${row.league.name} was approved.` : `Your registration in ${row.league.name} was declined.`, href: "/player" });
   return { success: true } as const;
 }
 

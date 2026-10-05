@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { fixtureResults, fixtures, leaguePlayers, leagues, teams, users } from "../drizzle/schema";
 import { getDb } from "./db";
 import { storagePut } from "./storage";
+import { createNotification } from "./notifications";
 
 const ACTIVE_RESULT_STATUSES = ["submitted", "disputed"] as const;
 
@@ -124,7 +125,7 @@ export async function submitPlayerResult(input: { fixtureId: number; homeScore: 
 
 async function decidePlayerResult(input: { fixtureId: number; userId: number; decision: "confirmed" | "disputed" }) {
   const db = await requireDb();
-  const { fixture, participants } = await requireParticipant(db, input.fixtureId, input.userId);
+  const { fixture, participants, league, homeTeam, awayTeam } = await requireParticipant(db, input.fixtureId, input.userId);
   const resultRows = await db.select().from(fixtureResults).where(eq(fixtureResults.fixtureId, input.fixtureId)).limit(1);
   const result = resultRows[0];
   if (fixture.status !== "result_submitted" || !result || result.status !== "submitted") throw new TRPCError({ code: "CONFLICT", message: "There is no pending result to decide." });
@@ -134,6 +135,12 @@ async function decidePlayerResult(input: { fixtureId: number; userId: number; de
     await tx.update(fixtureResults).set({ status: input.decision, confirmedBy: input.decision === "confirmed" ? input.userId : null, disputedAt: input.decision === "disputed" ? new Date() : null }).where(and(eq(fixtureResults.id, result.id), eq(fixtureResults.status, "submitted")));
     await tx.update(fixtures).set({ status: input.decision === "confirmed" ? "confirmed" : "disputed", playedAt: input.decision === "confirmed" ? new Date() : null }).where(and(eq(fixtures.id, input.fixtureId), eq(fixtures.status, "result_submitted")));
   });
+  if (input.decision === "disputed") {
+    const recipients = Array.from(new Set([league.createdBy, result.submittedBy]));
+    for (const userId of recipients) {
+      await createNotification(db, { userId, type: "dispute", title: "Match result disputed", message: `The result for ${homeTeam.name} vs ${awayTeam.name} was disputed and needs review.`, href: league.createdBy === userId ? "/match-management" : "/matches" });
+    }
+  }
   return { success: true } as const;
 }
 
