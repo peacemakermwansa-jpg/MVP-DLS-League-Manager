@@ -2,7 +2,7 @@ import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   addTeam, createLeague, deleteLeague, generateFixtures, getLeagueDashboard, listLeagues,
   recordResult, removeTeam, updateLeague, updateTeam,
@@ -12,6 +12,7 @@ import {
   assignPlayerTeam, reviewPlayer, teamPage, updateOwnProfile,
 } from "./players";
 import { confirmPlayerResult, disputePlayerResult, ownerMatchManagement, playerFixtures, resolveAdminResult, submitPlayerResult } from "./matches";
+import { chooseAccountType } from "./db";
 
 const leagueIdInput = z.object({ leagueId: z.number().int().positive() });
 const playerIdInput = z.object({ playerId: z.number().int().min(100000).max(999999) });
@@ -24,12 +25,13 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
+    chooseAccountType: protectedProcedure.input(z.object({ accountType: z.enum(["admin", "participant"]) })).mutation(({ ctx, input }) => chooseAccountType(ctx.user.id, input.accountType)),
     logout: publicProcedure.mutation(({ ctx }) => { const cookieOptions = getSessionCookieOptions(ctx.req); ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 }); return { success: true } as const; }),
   }),
   league: router({
     overview: protectedProcedure.query(({ ctx }) => listLeagues(ctx.user.id)),
     dashboard: protectedProcedure.input(leagueIdInput).query(({ ctx, input }) => getLeagueDashboard(input.leagueId, ctx.user.id)),
-    create: protectedProcedure.input(leagueDetails).mutation(({ ctx, input }) => createLeague({ ...input, userId: ctx.user.id })),
+    create: adminProcedure.input(leagueDetails).mutation(({ ctx, input }) => createLeague({ ...input, userId: ctx.user.id })),
     update: protectedProcedure.input(leagueDetails.extend({ leagueId: z.number().int().positive() })).mutation(({ ctx, input }) => updateLeague({ ...input, userId: ctx.user.id })),
     delete: protectedProcedure.input(leagueIdInput).mutation(({ ctx, input }) => deleteLeague(input.leagueId, ctx.user.id)),
     addTeam: protectedProcedure.input(leagueIdInput.merge(teamDetails)).mutation(({ ctx, input }) => addTeam({ ...input, userId: ctx.user.id })),

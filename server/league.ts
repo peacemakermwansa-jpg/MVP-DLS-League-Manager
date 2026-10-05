@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { fixtures, leagues, teams, type Fixture, type Team } from "../drizzle/schema";
+import { fixtures, leagues, teams, users, type Fixture, type Team } from "../drizzle/schema";
 import { getDb } from "./db";
 
 export type ScheduledFixture = Fixture & { homeTeam: Team; awayTeam: Team };
@@ -92,8 +92,8 @@ async function requireDb() {
 }
 
 async function requireOwnedLeague(db: Awaited<ReturnType<typeof requireDb>>, leagueId: number, userId: number) {
-  const rows = await db.select().from(leagues).where(and(eq(leagues.id, leagueId), eq(leagues.createdBy, userId))).limit(1);
-  const league = rows[0];
+  const rows = await db.select({ league: leagues }).from(leagues).innerJoin(users, eq(users.id, leagues.createdBy)).where(and(eq(leagues.id, leagueId), eq(leagues.createdBy, userId), eq(users.role, "admin"))).limit(1);
+  const league = rows[0]?.league;
   if (!league) throw new TRPCError({ code: "NOT_FOUND", message: "League not found." });
   return league;
 }

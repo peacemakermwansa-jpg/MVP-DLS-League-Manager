@@ -27,7 +27,7 @@ describeWithDatabase("player registration and permissions", () => {
     const [adminPlayerId, playerPlayerId, joinerPlayerId] = await allocateTestPlayerIds(db, 3);
     createdOpenIds.push(adminOpenId, playerOpenId, joinerOpenId);
     await db.insert(users).values([
-      { openId: adminOpenId, playerId: adminPlayerId, name: "Player Admin", email: `${adminOpenId}@example.test`, loginMethod: "test" },
+      { openId: adminOpenId, playerId: adminPlayerId, name: "Player Admin", email: `${adminOpenId}@example.test`, loginMethod: "test", role: "admin", accountTypeSelected: true },
       { openId: playerOpenId, playerId: playerPlayerId, name: "Player User", email: `${playerOpenId}@example.test`, loginMethod: "test" },
       { openId: joinerOpenId, playerId: joinerPlayerId, name: "League Joiner", email: `${joinerOpenId}@example.test`, loginMethod: "test" },
     ]);

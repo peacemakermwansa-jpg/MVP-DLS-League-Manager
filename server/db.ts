@@ -65,6 +65,11 @@ export async function upsertUser(user: UpsertUser): Promise<void> {
     } else if (user.openId === ENV.ownerOpenId) {
       updateSet.role = "admin";
     }
+    if (user.accountTypeSelected !== undefined) {
+      updateSet.accountTypeSelected = user.accountTypeSelected;
+    } else if (user.openId === ENV.ownerOpenId) {
+      updateSet.accountTypeSelected = true;
+    }
     if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
 
     const existing = await db.select({ playerId: users.playerId }).from(users).where(eq(users.openId, user.openId)).limit(1);
@@ -102,4 +107,18 @@ export async function getUserByOpenId(openId: string) {
   }
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
   return result.length > 0 ? result[0] : undefined;
+}
+
+export async function chooseAccountType(userId: number, role: "admin" | "participant") {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available.");
+  const existing = await db.select({ accountTypeSelected: users.accountTypeSelected }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!existing[0]) throw new Error("User account was not found.");
+  if (existing[0].accountTypeSelected) throw new Error("Account type has already been selected.");
+  const result = await db
+    .update(users)
+    .set({ role, accountTypeSelected: true })
+    .where(eq(users.id, userId));
+  if (result[0].affectedRows !== 1) throw new Error("User account was not found.");
+  return { role, accountTypeSelected: true } as const;
 }

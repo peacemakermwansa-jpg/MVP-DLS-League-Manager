@@ -20,6 +20,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
+import { trpc } from "@/lib/trpc";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   CalendarDays,
   ClipboardCheck,
@@ -50,6 +52,13 @@ const menuItems = [
   { icon: ClipboardCheck, label: "Match management", path: "/match-management" },
 ];
 
+const participantMenuItems = [
+  { icon: LayoutDashboard, label: "My player centre", path: "/player" },
+  { icon: Flag, label: "My matches", path: "/matches" },
+];
+
+const adminOnlyPaths = new Set(["/", "/leagues", "/teams", "/fixtures", "/results", "/table", "/players", "/match-management"]);
+
 const SIDEBAR_WIDTH_KEY = "mvp-sidebar-width";
 const DEFAULT_WIDTH = 254;
 const MIN_WIDTH = 210;
@@ -70,6 +79,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   if (loading) return <DashboardLayoutSkeleton />;
   if (!user) return <AuthScreen />;
+  if (!user.accountTypeSelected) return <AccountTypeSelection />;
 
   return (
     <SidebarProvider
@@ -94,13 +104,19 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find((item) => item.path === location);
+  const role = user?.role ?? "participant";
+  const visibleMenuItems = role === "admin" ? menuItems : participantMenuItems;
+  const activeMenuItem = visibleMenuItems.find((item) => item.path === location);
   const displayName = user?.name || "League administrator";
   const initials = displayName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
   }, [isCollapsed]);
+
+  useEffect(() => {
+    if (role === "participant" && adminOnlyPaths.has(location)) setLocation("/player");
+  }, [location, role, setLocation]);
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -149,7 +165,7 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
           <SidebarContent className="gap-0 px-3 py-5">
             {!isCollapsed && <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-sidebar-foreground/40">Workspace</p>}
             <SidebarMenu className="gap-1">
-              {menuItems.map((item) => {
+              {visibleMenuItems.map((item) => {
                 const isActive = location === item.path;
                 return (
                   <SidebarMenuItem key={item.path}>
@@ -234,6 +250,40 @@ function AuthScreen() {
         </div>
         <p className="mt-6 text-center text-xs leading-5 text-muted-foreground">Authentication is handled securely by the configured Manus OAuth provider. New users can create an account from the same secure flow.</p>
       </div>
+    </div>
+  );
+}
+
+function AccountTypeSelection() {
+  const utils = trpc.useUtils();
+  const chooseAccountType = trpc.auth.chooseAccountType.useMutation({
+    onSuccess: async () => {
+      await utils.auth.me.invalidate();
+    },
+  });
+
+  return (
+    <div className="mvp-grid grid min-h-screen place-items-center bg-background p-6">
+      <Card className="w-full max-w-3xl rounded-[28px] border-border/80 bg-card shadow-[0_20px_70px_rgba(22,25,38,0.08)]">
+        <CardContent className="p-7 sm:p-10">
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">Set up your MVP account</p>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight">How will you use MVP?</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">Choose the account type that best matches your role. You can participate in leagues from either account type, but only admins can create and manage leagues they own.</p>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            <button type="button" disabled={chooseAccountType.isPending} onClick={() => chooseAccountType.mutate({ accountType: "admin" })} className="rounded-2xl border border-primary/30 bg-primary/5 p-5 text-left transition-colors hover:border-primary hover:bg-primary/10 disabled:cursor-wait disabled:opacity-60">
+              <p className="text-lg font-bold">Create &amp; manage leagues</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Create leagues, register teams, manage participants, generate fixtures, and resolve results for leagues you own.</p>
+              <span className="mt-5 inline-flex rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Choose Admin</span>
+            </button>
+            <button type="button" disabled={chooseAccountType.isPending} onClick={() => chooseAccountType.mutate({ accountType: "participant" })} className="rounded-2xl border border-border bg-background p-5 text-left transition-colors hover:border-primary/50 hover:bg-muted disabled:cursor-wait disabled:opacity-60">
+              <p className="text-lg font-bold">Join leagues</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Use a League ID to register, view your teams and fixtures, and submit or confirm results where permitted.</p>
+              <span className="mt-5 inline-flex rounded-xl border border-border px-4 py-2 text-sm font-bold">Choose Participant</span>
+            </button>
+          </div>
+          {chooseAccountType.error && <p className="mt-4 text-sm font-semibold text-destructive">{chooseAccountType.error.message}</p>}
+        </CardContent>
+      </Card>
     </div>
   );
 }

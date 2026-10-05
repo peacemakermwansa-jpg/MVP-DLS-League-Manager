@@ -36,8 +36,8 @@ describeWithDatabase("league ownership flow", () => {
     const [accountAPlayerId, accountBPlayerId] = await allocateTestPlayerIds(db, 2);
     createdOpenIds.push(accountAOpenId, accountBOpenId);
     await db.insert(users).values([
-      { openId: accountAOpenId, playerId: accountAPlayerId, name: "Account A", email: `${accountAOpenId}@example.test`, loginMethod: "test" },
-      { openId: accountBOpenId, playerId: accountBPlayerId, name: "Account B", email: `${accountBOpenId}@example.test`, loginMethod: "test" },
+      { openId: accountAOpenId, playerId: accountAPlayerId, name: "Account A", email: `${accountAOpenId}@example.test`, loginMethod: "test", role: "admin", accountTypeSelected: true },
+      { openId: accountBOpenId, playerId: accountBPlayerId, name: "Account B", email: `${accountBOpenId}@example.test`, loginMethod: "test", role: "admin", accountTypeSelected: true },
     ]);
     const accountRows = await db.select().from(users).where(orUserIds(accountAOpenId, accountBOpenId));
     const accountA = accountRows.find((user) => user.openId === accountAOpenId);

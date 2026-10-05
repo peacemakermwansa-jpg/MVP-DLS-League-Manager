@@ -11,9 +11,9 @@ async function requireDb() {
 }
 
 async function requireOwnedLeague(db: Awaited<ReturnType<typeof requireDb>>, leagueId: number, userId: number) {
-  const rows = await db.select().from(leagues).where(and(eq(leagues.id, leagueId), eq(leagues.createdBy, userId))).limit(1);
+  const rows = await db.select({ league: leagues }).from(leagues).innerJoin(users, eq(users.id, leagues.createdBy)).where(and(eq(leagues.id, leagueId), eq(leagues.createdBy, userId), eq(users.role, "admin"))).limit(1);
   if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "League not found." });
-  return rows[0];
+  return rows[0].league;
 }
 
 async function getMembership(db: Awaited<ReturnType<typeof requireDb>>, leagueId: number, userId: number) {

@@ -28,7 +28,7 @@ describeWithDatabase("player-submitted fixture results", () => {
     const [adminPlayerId, homePlayerId, awayPlayerId, outsiderPlayerId] = await allocateTestPlayerIds(db, 4);
     createdOpenIds.push(adminOpenId, homeOpenId, awayOpenId, outsiderOpenId);
     await db.insert(users).values([
-      { openId: adminOpenId, playerId: adminPlayerId, name: "Match Admin", email: `${adminOpenId}@example.test`, loginMethod: "test" },
+      { openId: adminOpenId, playerId: adminPlayerId, name: "Match Admin", email: `${adminOpenId}@example.test`, loginMethod: "test", role: "admin", accountTypeSelected: true },
       { openId: homeOpenId, playerId: homePlayerId, name: "Arsenal Player", email: `${homeOpenId}@example.test`, loginMethod: "test" },
       { openId: awayOpenId, playerId: awayPlayerId, name: "Barcelona Player", email: `${awayOpenId}@example.test`, loginMethod: "test" },
       { openId: outsiderOpenId, playerId: outsiderPlayerId, name: "Unrelated Player", email: `${outsiderOpenId}@example.test`, loginMethod: "test" },

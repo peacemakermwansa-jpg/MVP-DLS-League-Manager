@@ -33,6 +33,11 @@ async function participantsForFixture(db: Db, fixture: { leagueId: number; homeT
   return { homePlayer: map.get(fixture.homeTeamId) ?? null, awayPlayer: map.get(fixture.awayTeamId) ?? null };
 }
 
+async function requireAdminLeagueOwner(db: Db, leagueId: number, userId: number) {
+  const rows = await db.select({ id: leagues.id }).from(leagues).innerJoin(users, eq(users.id, leagues.createdBy)).where(and(eq(leagues.id, leagueId), eq(leagues.createdBy, userId), eq(users.role, "admin"))).limit(1);
+  if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "League not found." });
+}
+
 function publicResult(result: typeof fixtureResults.$inferSelect | null) {
   if (!result) return null;
   return { id: result.id, submittedBy: result.submittedBy, homeScore: result.homeScore, awayScore: result.awayScore, proofUrl: result.proofUrl, status: result.status, confirmedBy: result.confirmedBy, disputedAt: result.disputedAt, resolvedAt: result.resolvedAt };
@@ -79,8 +84,7 @@ export async function playerFixtures(userId: number) {
 
 export async function ownerMatchManagement(leagueId: number, userId: number) {
   const db = await requireDb();
-  const ownerRows = await db.select({ id: leagues.id }).from(leagues).where(and(eq(leagues.id, leagueId), eq(leagues.createdBy, userId))).limit(1);
-  if (!ownerRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "League not found." });
+  await requireAdminLeagueOwner(db, leagueId, userId);
   const fixtureRows = await db.select({ id: fixtures.id }).from(fixtures).where(eq(fixtures.leagueId, leagueId)).orderBy(asc(fixtures.round), asc(fixtures.id));
   return Promise.all(fixtureRows.map((fixture) => decorateFixture(db, fixture.id, userId)));
 }
@@ -139,7 +143,7 @@ export function disputePlayerResult(fixtureId: number, userId: number) { return 
 export async function resolveAdminResult(input: { fixtureId: number; action: "approve" | "correct" | "cancel"; homeScore?: number; awayScore?: number; userId: number }) {
   const db = await requireDb();
   const row = await getFixture(db, input.fixtureId);
-  if (row.league.createdBy !== input.userId) throw new TRPCError({ code: "NOT_FOUND", message: "Fixture not found." });
+  await requireAdminLeagueOwner(db, row.league.id, input.userId);
   const resultRows = await db.select().from(fixtureResults).where(eq(fixtureResults.fixtureId, input.fixtureId)).limit(1);
   const result = resultRows[0];
   if (!result || !["submitted", "disputed"].includes(result.status)) throw new TRPCError({ code: "CONFLICT", message: "There is no active submission to resolve." });

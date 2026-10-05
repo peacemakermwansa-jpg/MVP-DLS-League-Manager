@@ -43,6 +43,13 @@
       "when": 1790601085448,
       "tag": "0005_sticky_microbe",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1791019045047,
+      "tag": "0006_amusing_golden_guardian",
+      "breakpoints": true
     }
   ]
 }
