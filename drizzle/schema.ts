@@ -9,10 +9,10 @@ import {
   varchar,
 } from "drizzle-orm/mysql-core";
 
-/** Core user table backing the existing Manus OAuth flow. */
+/** Canonical user/profile table. Manus identity remains populated for existing OAuth users. */
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
+  openId: varchar("openId", { length: 64 }).unique(),
   playerId: int("playerId").notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
@@ -39,6 +39,49 @@ export const notifications = mysqlTable("notifications", {
 });
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
+
+/** MVP-owned credential record linked to the canonical users row. */
+export const localCredentials = mysqlTable("localCredentials", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  passwordHash: text("passwordHash").notNull(),
+  emailVerifiedAt: timestamp("emailVerifiedAt"),
+  passwordSetAt: timestamp("passwordSetAt").defaultNow().notNull(),
+  passwordChangedAt: timestamp("passwordChangedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type LocalCredential = typeof localCredentials.$inferSelect;
+export type InsertLocalCredential = typeof localCredentials.$inferInsert;
+
+/** Opaque MVP session tokens are hashed before storage and can be revoked server-side. */
+export const authSessions = mysqlTable("authSessions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+  revokedAt: timestamp("revokedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type AuthSession = typeof authSessions.$inferSelect;
+export type InsertAuthSession = typeof authSessions.$inferInsert;
+
+/** Hashed, single-use tokens for future verification and password-reset emails. */
+export const authTokens = mysqlTable("authTokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: mysqlEnum("type", ["password_reset", "email_verification"]).notNull(),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  consumedAt: timestamp("consumedAt"),
+  revokedAt: timestamp("revokedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AuthToken = typeof authTokens.$inferSelect;
+export type InsertAuthToken = typeof authTokens.$inferInsert;
 
 /** A competition/season belongs to exactly one authenticated user. */
 export const leagues = mysqlTable("leagues", {
