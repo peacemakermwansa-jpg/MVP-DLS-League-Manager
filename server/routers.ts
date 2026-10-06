@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
+import { COOKIE_NAME, LOCAL_COOKIE_NAME } from "@shared/const";
+import { getLocalSessionCookieOptions, getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
@@ -14,6 +14,8 @@ import {
 import { confirmPlayerResult, disputePlayerResult, ownerMatchManagement, playerFixtures, resolveAdminResult, submitPlayerResult } from "./matches";
 import { chooseAccountType } from "./db";
 import { listNotifications, markAllNotificationsRead, markNotificationRead } from "./notifications";
+import { authenticateLocalUser, createLocalSession, createLocalUser, getLocalSessionToken, revokeLocalSession } from "./local-auth";
+import { TRPCError } from "@trpc/server";
 
 const leagueIdInput = z.object({ leagueId: z.number().int().positive() });
 const playerIdInput = z.object({ playerId: z.number().int().min(100000).max(999999) });
@@ -21,13 +23,32 @@ const teamDetails = z.object({ name: z.string().trim().min(2).max(120), managerN
 const leagueDetails = z.object({ name: z.string().trim().min(2).max(120), seasonName: z.string().trim().min(2).max(120), numberOfTeams: z.number().int().min(2).max(32) });
 const playerDetails = z.object({ playerName: z.string().trim().min(2).max(120), username: z.string().trim().min(2).max(64).regex(/^[a-zA-Z0-9_.-]+$/), profilePicture: z.string().trim().url().max(500).optional().or(z.literal("")), whatsappNumber: z.string().trim().max(32).optional().or(z.literal("")) });
 const scoreDetails = z.object({ fixtureId: z.number().int().positive(), homeScore: z.number().int().min(0).max(99), awayScore: z.number().int().min(0).max(99) });
+const localSignupInput = z.object({ name: z.string().trim().min(2).max(120), email: z.string().trim().email().max(320), password: z.string().min(12).max(200) });
+const localLoginInput = z.object({ email: z.string().trim().email().max(320), password: z.string().min(1).max(200) });
 
 export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
+    signup: publicProcedure.input(localSignupInput).mutation(async ({ ctx, input }) => {
+      try {
+        const user = await createLocalUser(input);
+        const session = await createLocalSession(user.id);
+        ctx.res.cookie(LOCAL_COOKIE_NAME, session.rawToken, { ...getLocalSessionCookieOptions(ctx.req), maxAge: session.expiresAt.getTime() - Date.now() });
+        return user;
+      } catch (error) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Could not create the account." });
+      }
+    }),
+    login: publicProcedure.input(localLoginInput).mutation(async ({ ctx, input }) => {
+      const user = await authenticateLocalUser(input.email, input.password);
+      if (!user) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
+      const session = await createLocalSession(user.id);
+      ctx.res.cookie(LOCAL_COOKIE_NAME, session.rawToken, { ...getLocalSessionCookieOptions(ctx.req), maxAge: session.expiresAt.getTime() - Date.now() });
+      return user;
+    }),
     chooseAccountType: protectedProcedure.input(z.object({ accountType: z.enum(["admin", "participant"]) })).mutation(({ ctx, input }) => chooseAccountType(ctx.user.id, input.accountType)),
-    logout: publicProcedure.mutation(({ ctx }) => { const cookieOptions = getSessionCookieOptions(ctx.req); ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 }); return { success: true } as const; }),
+    logout: publicProcedure.mutation(async ({ ctx }) => { const localToken = getLocalSessionToken(ctx.req); if (localToken) await revokeLocalSession(localToken); const cookieOptions = getSessionCookieOptions(ctx.req); ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 }); ctx.res.clearCookie(LOCAL_COOKIE_NAME, { ...getLocalSessionCookieOptions(ctx.req), maxAge: -1 }); return { success: true } as const; }),
   }),
   league: router({
     overview: protectedProcedure.query(({ ctx }) => listLeagues(ctx.user.id)),

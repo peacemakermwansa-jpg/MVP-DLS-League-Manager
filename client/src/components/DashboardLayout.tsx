@@ -239,6 +239,20 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
 }
 
 function AuthScreen() {
+  const utils = trpc.useUtils();
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const signup = trpc.auth.signup.useMutation({ onSuccess: () => utils.auth.me.invalidate() });
+  const login = trpc.auth.login.useMutation({ onSuccess: () => utils.auth.me.invalidate() });
+  const mutation = mode === "login" ? login : signup;
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (mode === "login") login.mutate({ email, password });
+    else signup.mutate({ name, email, password });
+  };
+
   return (
     <div className="mvp-grid grid min-h-screen place-items-center bg-background p-6">
       <div className="w-full max-w-md rounded-[28px] border border-border/80 bg-card p-7 shadow-[0_20px_70px_rgba(22,25,38,0.08)] sm:p-9">
@@ -246,14 +260,24 @@ function AuthScreen() {
           <div className="grid size-11 place-items-center rounded-2xl bg-primary text-sm font-black text-primary-foreground shadow-[0_8px_24px_rgba(151,190,30,0.24)]">MVP</div>
           <div><p className="text-sm font-black uppercase tracking-[0.18em]">MVP</p><p className="text-xs text-muted-foreground">DLS League Manager</p></div>
         </div>
-        <p className="mt-10 text-[11px] font-bold uppercase tracking-[0.2em] text-primary">Private league workspace</p>
+        <p className="mt-10 text-[11px] font-bold uppercase tracking-[0.2em] text-primary">MVP account</p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight">Manage your competition with confidence.</h1>
-        <p className="mt-4 text-sm leading-6 text-muted-foreground">Sign in to create leagues, register teams, record results, and keep your own standings secure.</p>
-        <div className="mt-7 grid gap-3">
-          <button onClick={() => startLogin()} className="flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground transition-transform active:scale-[0.98]"><LogIn className="size-4" /> Log in</button>
-          <button onClick={() => startLogin()} className="flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-transparent px-4 text-sm font-bold transition-colors hover:bg-muted active:scale-[0.98]">Create an account <span aria-hidden="true">→</span></button>
+        <p className="mt-4 text-sm leading-6 text-muted-foreground">Use your MVP account to create leagues, register teams, record results, and keep your standings secure.</p>
+        <div className="mt-7 grid grid-cols-2 rounded-xl bg-muted p-1 text-sm font-bold">
+          <button type="button" onClick={() => { setMode("login"); mutation.reset(); }} className={`rounded-lg py-2.5 transition-colors ${mode === "login" ? "bg-background shadow-sm" : "text-muted-foreground"}`}>Log in</button>
+          <button type="button" onClick={() => { setMode("signup"); mutation.reset(); }} className={`rounded-lg py-2.5 transition-colors ${mode === "signup" ? "bg-background shadow-sm" : "text-muted-foreground"}`}>Sign up</button>
         </div>
-        <p className="mt-6 text-center text-xs leading-5 text-muted-foreground">Authentication is handled securely by the configured Manus OAuth provider. New users can create an account from the same secure flow.</p>
+        <form onSubmit={submit} className="mt-4 grid gap-3">
+          {mode === "signup" && <label className="grid gap-1.5 text-sm font-semibold">Your name<input required minLength={2} maxLength={120} value={name} onChange={(event) => setName(event.target.value)} className="h-12 rounded-xl border border-border bg-background px-3 font-normal outline-none ring-primary/30 focus:ring-4" placeholder="Your full name" /></label>}
+          <label className="grid gap-1.5 text-sm font-semibold">Email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="h-12 rounded-xl border border-border bg-background px-3 font-normal outline-none ring-primary/30 focus:ring-4" placeholder="you@example.com" autoComplete="email" /></label>
+          <label className="grid gap-1.5 text-sm font-semibold">Password<input required minLength={mode === "signup" ? 12 : 1} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="h-12 rounded-xl border border-border bg-background px-3 font-normal outline-none ring-primary/30 focus:ring-4" placeholder={mode === "signup" ? "At least 12 characters" : "Your password"} autoComplete={mode === "signup" ? "new-password" : "current-password"} /></label>
+          {mutation.error && <p role="alert" className="rounded-xl bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">{mutation.error.message}</p>}
+          <button type="submit" disabled={mutation.isPending} className="mt-1 flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground transition-transform active:scale-[0.98] disabled:cursor-wait disabled:opacity-60"><LogIn className="size-4" />{mutation.isPending ? "Please wait…" : mode === "login" ? "Log in to MVP" : "Create MVP account"}</button>
+        </form>
+        <div className="mt-5 border-t border-border pt-4 text-center">
+          <button type="button" onClick={() => startLogin()} className="text-xs font-semibold text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Continue with existing Manus account</button>
+          <p className="mt-2 text-[11px] leading-5 text-muted-foreground">Existing OAuth users can keep using Manus while they prepare a local MVP password.</p>
+        </div>
       </div>
     </div>
   );

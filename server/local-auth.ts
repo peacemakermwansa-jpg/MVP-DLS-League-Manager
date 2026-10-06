@@ -1,6 +1,9 @@
-import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomInt, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import type { Request } from "express";
+import { parse as parseCookieHeader } from "cookie";
+import { LOCAL_COOKIE_NAME } from "@shared/const";
 import { authSessions, authTokens, localCredentials, users } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -84,6 +87,11 @@ export async function revokeLocalSession(rawToken: string, now = new Date()) {
   await db.update(authSessions).set({ revokedAt: now }).where(and(eq(authSessions.tokenHash, hashAuthToken(rawToken)), isNull(authSessions.revokedAt)));
 }
 
+export function getLocalSessionToken(req: Request) {
+  const token = parseCookieHeader(req.headers.cookie ?? "")[LOCAL_COOKIE_NAME];
+  return typeof token === "string" ? token : null;
+}
+
 export async function createAuthToken(input: { userId: number; type: AuthTokenType; expiresInMs: number; now?: Date }) {
   const db = await requireDb();
   const now = input.now ?? new Date();
@@ -112,4 +120,41 @@ export async function localCredentialForEmail(email: string) {
   const db = await requireDb();
   const rows = await db.select({ credential: localCredentials, user: users }).from(localCredentials).innerJoin(users, eq(users.id, localCredentials.userId)).where(eq(localCredentials.email, normalizeAuthEmail(email))).limit(1);
   return rows[0] ?? null;
+}
+
+async function generatePlayerId(db: Db) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const playerId = randomInt(100000, 1000000);
+    const rows = await db.select({ id: users.id }).from(users).where(eq(users.playerId, playerId)).limit(1);
+    if (!rows[0]) return playerId;
+  }
+  throw new Error("Could not allocate a unique Player ID.");
+}
+
+export async function createLocalUser(input: { name: string; email: string; password: string }) {
+  const db = await requireDb();
+  const email = normalizeAuthEmail(input.email);
+  if (!email || !input.name.trim()) throw new Error("Name and email are required.");
+  if (await localCredentialForEmail(email)) throw new Error("An account with this email already exists.");
+  const passwordHash = await hashPassword(input.password);
+  const playerId = await generatePlayerId(db);
+  try {
+    return await db.transaction(async (tx) => {
+      const userResult = await tx.insert(users).values({ openId: null, playerId, name: input.name.trim(), email, loginMethod: "mvp", role: "participant", accountTypeSelected: false });
+      const userId = Number(userResult[0].insertId);
+      await tx.insert(localCredentials).values({ userId, email, passwordHash });
+      const created = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!created[0]) throw new Error("Could not create the account.");
+      return created[0];
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code === "ER_DUP_ENTRY") throw new Error("An account with this email already exists.");
+    throw error;
+  }
+}
+
+export async function authenticateLocalUser(emailInput: string, password: string) {
+  const record = await localCredentialForEmail(emailInput);
+  if (!record || !(await verifyPassword(password, record.credential.passwordHash))) return null;
+  return record.user;
 }

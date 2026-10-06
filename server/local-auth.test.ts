@@ -6,6 +6,8 @@ import { getEmailProviderConfig, isEmailProviderConfigured, sendTransactionalEma
 import { allocateTestPlayerIds } from "./test-player-ids";
 import { consumeAuthToken, createAuthToken, createLocalSession, hashAuthToken, hashPassword, localCredentialForEmail, revokeAuthTokens, revokeLocalSession, validateLocalSession, verifyPassword, LOCAL_SESSION_TTL_MS } from "./local-auth";
 import { registerOAuthRoutes } from "./_core/oauth";
+import { appRouter } from "./routers";
+import type { TrpcContext } from "./_core/context";
 
 const describeWithDatabase = process.env.DATABASE_URL ? describe : describe.skip;
 const temporaryUserIds: number[] = [];
@@ -45,6 +47,32 @@ describe("local authentication primitives", () => {
 });
 
 describeWithDatabase("local authentication database foundation", () => {
+  it("supports MVP signup, login, and logout without invoking Manus OAuth", async () => {
+    const cookies: Array<{ name: string; value: string; options?: Record<string, unknown> }> = [];
+    const req = { protocol: "https", headers: {} } as TrpcContext["req"];
+    const ctx = {
+      req,
+      res: {
+        cookie: (name: string, value: string, options?: Record<string, unknown>) => cookies.push({ name, value, options }),
+        clearCookie: () => undefined,
+      },
+      user: null,
+    } as unknown as TrpcContext;
+    const caller = appRouter.createCaller(ctx);
+    const email = `router-local-${Date.now()}@example.test`;
+    const signup = await caller.auth.signup({ name: "Router Local User", email, password: "a secure test password" });
+    temporaryUserIds.push(signup.id);
+    expect(signup.openId).toBeNull();
+    expect(cookies.at(-1)?.name).toBe("mvp_session");
+
+    const loginCookies: Array<{ name: string; value: string }> = [];
+    const loginContext = { ...ctx, res: { cookie: (name: string, value: string) => loginCookies.push({ name, value }), clearCookie: () => undefined } } as unknown as TrpcContext;
+    const loggedIn = await appRouter.createCaller(loginContext).auth.login({ email, password: "a secure test password" });
+    expect(loggedIn.id).toBe(signup.id);
+    expect(loginCookies.at(-1)?.name).toBe("mvp_session");
+    await expect(appRouter.createCaller(loginContext).auth.login({ email, password: "wrong password" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
   it("creates, validates, expires, revokes, and consumes auth records without changing user relationships", async () => {
     const db = await getDb();
     if (!db) throw new Error("DATABASE_URL is required for this integration test.");
